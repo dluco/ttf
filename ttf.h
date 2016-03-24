@@ -6,7 +6,7 @@
 union _cmap_mappingTable;
 struct _cmap_subTable;
 struct _cmap_Table;
-struct _Glyph;
+struct _TTF_Glyph;
 struct _glyf_Table;
 struct _head_Table;
 struct _hhea_Table;
@@ -62,6 +62,12 @@ typedef struct _cmap_subTable {
 	uint16_t platform_specifid_id;
 	uint32_t offset;
 
+	uint32_t format;
+	uint32_t length;
+	uint32_t language;
+
+	uint32_t *glyph_index_array;
+
 	cmap_mappingTable mapping_table;
 } cmap_subTable;
 
@@ -69,21 +75,32 @@ typedef struct _cmap_Table {
 	uint16_t version;
 	uint16_t num_subtables;
 
-	cmap_subTable **subtables;
+	cmap_subTable *subtables;
 } cmap_Table;
 
-typedef struct _Glyph {
+typedef struct _TTF_Glyph {
 	int16_t number_of_contours;
 	int16_t x_min;
 	int16_t y_min;
 	int16_t x_max;
 	int16_t y_max;
 
-	// TODO: simple and compound glyphs
-} Glyph;
+	uint16_t *end_pts_of_contours;
+	uint16_t instruction_length;
+	uint8_t *instructions;
+	uint8_t *flags;
+	int16_t *x_coordinates;
+	int16_t *y_coordinates;
+
+	int16_t num_points;
+
+	// TODO: Compound glyphs
+} TTF_Glyph;
 
 typedef struct _glyf_Table {
-	Glyph *glyphs;
+	TTF_Glyph *glyphs;
+
+	uint16_t num_glyphs; // Copied from maxp table
 } glyf_Table;
 
 typedef struct _head_Table {
@@ -162,7 +179,7 @@ typedef struct _post_Table {
 	uint32_t min_mem_type_1;
 	uint32_t max_mem_type_1;
 
-	char **glyph_names;
+	char *glyph_names[];
 } post_Table;
 
 typedef struct _TTF_Table {
@@ -189,19 +206,33 @@ typedef struct _TTF_Font {
 	uint16_t entry_selector;
 	uint16_t range_shift;
 
-	TTF_Table **tables;
 	int fd;
+	TTF_Table *tables;
 } TTF_Font;
 
 #define TAG_LENGTH	4
+
+uint8_t read_byte(int fd);
+uint16_t read_hword(int fd);
+uint32_t read_word(int fd);
+uint64_t read_dword(int fd);
+uint16_t read_ushort(int fd);
+int16_t read_short(int fd);
+uint32_t read_ulong(int fd);
+uint32_t read_fixed(int fd);
+uint32_t read_tag(int fd);
+int64_t read_longdatetime(int fd);
+
+float fixed_to_float(uint32_t fixed);
+uint32_t s_to_tag(const char *s);
+
+uint32_t calc_table_check_sum(uint32_t *data, uint32_t length);
+int validate_check_sums(TTF_Font *font);
 
 int read_font_dir(TTF_Font *font);
 
 int read_table_raw(TTF_Font *font, TTF_Table *table, uint32_t *buf);
 int load_tables(TTF_Font *font);
-
-uint32_t calc_table_check_sum(uint32_t *data, uint32_t length);
-int validate_check_sums(TTF_Font *font);
 
 void free_table(TTF_Table *table);
 void free_font(TTF_Font *font);
@@ -209,10 +240,11 @@ void free_font(TTF_Font *font);
 TTF_Table *get_table(TTF_Font *font, uint32_t tag);
 TTF_Font *parse_file(const char *filename);
 
-void debug_print_font_dir(TTF_Font *font);
-void debug_print_cmap_table(cmap_Table *cmap);
-void debug_print_head_table(head_Table *head);
-void debug_print_table(TTF_Table *table);
-void debug_print_font(TTF_Font *font);
+void print_font_dir(TTF_Font *font);
+void print_cmap_table(cmap_Table *cmap);
+void print_head_table(head_Table *head);
+void print_hhea_table(hhea_Table *hhea);
+void print_table(TTF_Table *table);
+void print_font(TTF_Font *font);
 
 #endif /* TTF_H */

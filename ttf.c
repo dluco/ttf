@@ -163,7 +163,7 @@ int read_font_dir(TTF_Font *font) {
 		return 0;
 	}
 
-	font->tables = (TTF_Table **) malloc(font->num_tables * sizeof(TTF_Table*));
+	font->tables = (TTF_Table *) malloc(font->num_tables * sizeof(*font->tables));
 	if (!font->tables) {
 		fprintf(stderr, "failed to alloc font tables: %s\n", strerror(errno));
 		return 0;
@@ -172,12 +172,7 @@ int read_font_dir(TTF_Font *font) {
 	// Read the table directory entries
 	int i;
 	for (i = 0; i < font->num_tables; i++) {
-		TTF_Table *table = (TTF_Table *) malloc(sizeof(TTF_Table));
-		if (!table) {
-			fprintf(stderr, "failed to alloc font table: %s\n", strerror(errno));
-			return 0;
-		}
-		font->tables[i] = table;
+		TTF_Table *table = &font->tables[i];
 
 		table->tag = read_tag(font->fd);
 		table->check_sum = read_ulong(font->fd);
@@ -228,7 +223,7 @@ uint32_t calc_table_check_sum(uint32_t *data, uint32_t length) {
 int validate_check_sums(TTF_Font *font) {
 	int i;
 	for (i = 0; i < font->num_tables; i++) {
-		TTF_Table *table = font->tables[i];
+		TTF_Table *table = &font->tables[i];
 		if (!table) {
 			continue;
 		}
@@ -254,54 +249,155 @@ int validate_check_sums(TTF_Font *font) {
 }
 
 int load_cmap_subtable(TTF_Font *font, cmap_subTable *subtable) {
-	cmap_mappingTable *mapping_table = NULL;
-	// Seek to start of mapping subtable
-	if (lseek(font->fd, subtable->offset, SEEK_SET) < 0) {
-		fprintf(stderr, "failed to seek to cmap mapping subtable: %s\n", strerror(errno));
+	maxp_Table *maxp = NULL;
+
+	// Get maxp table
+	TTF_Table *temp = get_table(font, s_to_tag("maxp"));
+	if (!temp) {
+		fprintf(stderr, "failed to get maxp table\n");
 		return 0;
 	}
-	mapping_table = &subtable->mapping_table;
+	maxp = &temp->data.maxp;
 
-	// TODO
-	uint16_t format = read_ushort(font->fd);
-	switch (format) {
+	// TODO: move each case to a separate function
+	subtable->format = read_ushort(font->fd);
+	if (subtable->format < 8) {
+		subtable->length = read_ushort(font->fd);
+		subtable->language = read_ushort(font->fd);
+	} else {
+		read_ushort(font->fd); // format was actually a Fixed, this is the .X part
+		subtable->length = read_ulong(font->fd);
+		subtable->language = read_ulong(font->fd);
+	}
+	switch (subtable->format) {
 		case 0:
-			printf("format 0!!!\n");
-
-			mapping_table->format_0.format = format;
-			mapping_table->format_0.length = read_ushort(font->fd);
-			mapping_table->format_0.language = read_ushort(font->fd);
-			int i;
-			for (i = 0; i < 256; i++) {
-				mapping_table->format_0.glyph_index_array[i] = read_byte(font->fd);
+			{
+				subtable->glyph_index_array = (uint32_t *) malloc(256 * sizeof(*subtable->glyph_index_array));
+				if (!subtable->glyph_index_array) {
+					fprintf(stderr, "failed to alloc cmap format 0 glyph index array: %s\n", strerror(errno));
+					return 0;
+				}
+				int i;
+				for (i = 0; i < 256; i++) {
+					uint8_t glyph_mapping = read_byte(font->fd);
+					subtable->glyph_index_array[i] = (glyph_mapping + 256) % 256;
+				}
 			}
 			break;
-		case 2:
-			printf("format 2!!!\n");
-			break;
 		case 4:
-			printf("format 4!!!\n");
+			{
+				int i;
+				uint16_t seg_count = read_ushort(font->fd) / 2;
+				uint16_t search_range = read_ushort(font->fd);
+				uint16_t entry_selector = read_ushort(font->fd);
+				uint16_t range_shift = read_ushort(font->fd);
+
+				// Alloc arrays
+				uint16_t *end_code = (uint16_t *) malloc(seg_count * sizeof(*end_code));
+				if (!end_code) {
+					fprintf(stderr, "failed to alloc cmap format 4 endCode array: %s\n", strerror(errno));
+					return 0;
+				}
+				uint16_t *start_code = (uint16_t *) malloc(seg_count * sizeof(*start_code));
+				if (!start_code) {
+					fprintf(stderr, "failed to alloc cmap format 4 startCode array: %s\n", strerror(errno));
+					return 0;
+				}
+				uint16_t *id_delta = (uint16_t *) malloc(seg_count * sizeof(*id_delta));
+				if (!id_delta) {
+					fprintf(stderr, "failed to alloc cmap format 4 idDelta array: %s\n", strerror(errno));
+					return 0;
+				}
+				uint16_t *id_range_offset = (uint16_t *) malloc(seg_count * sizeof(*id_range_offset));
+				if (!id_range_offset) {
+					fprintf(stderr, "failed to alloc cmap format 4 idRangeOffset array: %s\n", strerror(errno));
+					return 0;
+				}
+
+				// Read arrays
+				for (i = 0; i < seg_count; i++) {
+					end_code[i] = read_ushort(font->fd);
+				}
+				uint16_t reserved_pad = read_ushort(font->fd);
+				for (i = 0; i < seg_count; i++) {
+					start_code[i] = read_ushort(font->fd);
+				}
+				for (i = 0; i < seg_count; i++) {
+					id_delta[i] = read_ushort(font->fd);
+				}
+				for (i = 0; i < seg_count; i++) {
+					id_range_offset[i] = read_ushort(font->fd);
+				}
+
+				subtable->glyph_index_array = (uint32_t *) malloc(maxp->num_glyphs * sizeof(*subtable->glyph_index_array));
+				if (!subtable->glyph_index_array) {
+					fprintf(stderr, "failed to alloc cmap format 4 glyph index array: %s\n", strerror(errno));
+					return 0;
+				}
+
+				off_t cur_pos;
+				if ((cur_pos = lseek(font->fd, 0, SEEK_CUR)) < 0) {
+					fprintf(stderr, "failed to get file position: %s\n", strerror(errno));
+					return 0;
+				}
+
+				for (i = 0; i < seg_count; i++) {
+					uint16_t start = start_code[i];
+					uint16_t end = end_code[i];
+					uint16_t delta = id_delta[i];
+					uint16_t range_offset = id_range_offset[i];
+					
+					if (start != (65536-1) && end != (65536-1)) {
+						int j;
+						for (j = start; j <= end; j++) {
+							if (range_offset == 0) {
+								subtable->glyph_index_array[(j + delta) % 65536] = j;
+							} else {
+								uint32_t glyph_offset = cur_pos +
+									((range_offset/2) + (j-start) + (i-seg_count))*2;
+								if (lseek(font->fd, glyph_offset, SEEK_SET) < 0) {
+									fprintf(stderr, "failed to seek to glyph offset: %s\n", strerror(errno));
+									return 0;
+								}
+								uint16_t glyph_index = read_ushort(font->fd);
+								if (glyph_index != 0) {
+									glyph_index = (glyph_index + delta) % 65536;
+									if (subtable->glyph_index_array[glyph_index] == 0) {
+										subtable->glyph_index_array[glyph_index] = j;
+									}
+								}
+							}
+						}
+					}
+				}
+
+				// FIXME: remove
+				search_range = 0;
+				entry_selector = 0;
+				range_shift = 0;
+				reserved_pad = 0;
+
+				free(end_code);
+				free(start_code);
+				free(id_delta);
+				free(id_range_offset);
+			}
 			break;
 		default:
-			break;
+			fprintf(stderr, "unsupported cmap subtable format: %u\n", subtable->format);
+			return 0;
 	}
 
 	return 1;
 }
 
 int load_cmap_table(TTF_Font *font, TTF_Table *table) {
-	cmap_Table *cmap = NULL;
-	// Seek to start of table
-	if (lseek(font->fd, table->offset, SEEK_SET) < 0) {
-		fprintf(stderr, "failed to seek to cmap table: %s\n", strerror(errno));
-		return 0;
-	}
-	cmap = &table->data.cmap;
+	cmap_Table *cmap = &table->data.cmap;
 
 	cmap->version = read_ushort(font->fd);
 	cmap->num_subtables = read_ushort(font->fd);
 
-	cmap->subtables = (cmap_subTable **) malloc(cmap->num_subtables * sizeof(cmap_subTable*));
+	cmap->subtables = (cmap_subTable *) malloc(cmap->num_subtables * sizeof(*cmap->subtables));
 	if (!cmap->subtables) {
 		fprintf(stderr, "failed to alloc cmap subtables: %s\n", strerror(errno));
 		return 0;
@@ -310,12 +406,7 @@ int load_cmap_table(TTF_Font *font, TTF_Table *table) {
 	off_t pos;
 	int i;
 	for (i = 0; i < cmap->num_subtables; i++) {
-		cmap_subTable *subtable = (cmap_subTable *) malloc(sizeof(cmap_subTable));
-		if (!subtable) {
-			fprintf(stderr, "failed to alloc cmap subtable: %s\n", strerror(errno));
-			return 0;
-		}
-		cmap->subtables[i] = subtable;
+		cmap_subTable *subtable = &cmap->subtables[i];
 
 		subtable->platform_id = read_ushort(font->fd);
 		subtable->platform_specifid_id = read_ushort(font->fd);
@@ -324,6 +415,12 @@ int load_cmap_table(TTF_Font *font, TTF_Table *table) {
 		// Save current file position
 		if ((pos = lseek(font->fd, 0, SEEK_CUR)) < 0) {
 			fprintf(stderr, "failed to save file position: %s\n", strerror(errno));
+			return 0;
+		}
+
+		// Seek to start of mapping subtable (relative to cmap table offset)
+		if (lseek(font->fd, table->offset + subtable->offset, SEEK_SET) < 0) {
+			fprintf(stderr, "failed to seek to cmap mapping subtable: %s\n", strerror(errno));
 			return 0;
 		}
 
@@ -339,26 +436,90 @@ int load_cmap_table(TTF_Font *font, TTF_Table *table) {
 	return 1;
 }
 
-int load_glyph(TTF_Font *font, Glyph *glyph) {
+int load_glyph(TTF_Font *font, TTF_Glyph *glyph) {
 	glyph->number_of_contours = read_short(font->fd);
 	glyph->x_min = read_short(font->fd);
 	glyph->y_min = read_short(font->fd);
 	glyph->x_max = read_short(font->fd);
 	glyph->y_max = read_short(font->fd);
 
+	if (glyph->number_of_contours == 0) {
+		glyph->num_points = 0;
+		return 1;
+	} else if (glyph->number_of_contours > 0) {
+		// Simple glyph
+		glyph->end_pts_of_contours = (uint16_t *) malloc(glyph->number_of_contours * sizeof(*glyph->end_pts_of_contours));
+		if (!glyph->end_pts_of_contours) {
+			fprintf(stderr, "failed to alloc glyph end points: %s\n", strerror(errno));
+			return 0;
+		}
+		int i;
+		for (i = 0; i < glyph->number_of_contours; i++) {
+			glyph->end_pts_of_contours[i] = read_ushort(font->fd);
+		}
+		// Get the last contour's end point index
+		int last_end_pt = glyph->end_pts_of_contours[glyph->number_of_contours - 1];
+		if (glyph->number_of_contours == 1 && last_end_pt == 65535) {
+			// Assume an empty glpyh
+			glyph->num_points = 0;
+			return 1;
+		}
+		// Last end point index indicates the number of points
+		glyph->num_points = last_end_pt + 1;
+
+		glyph->instruction_length = read_ushort(font->fd);
+
+		glyph->instructions = (uint8_t *) malloc(glyph->instruction_length * sizeof(*glyph->instructions));
+		if (!glyph->instructions) {
+			fprintf(stderr, "failed to alloc glyph instructions: %s\n", strerror(errno));
+			return 0;
+		}
+
+		glyph->flags = (uint8_t *) malloc(glyph->num_points * sizeof(*glyph->flags));
+		if (!glyph->flags) {
+			fprintf(stderr, "failed to alloc glyph flags: %s\n", strerror(errno));
+			return 0;
+		}
+		glyph->x_coordinates = (int16_t *) malloc(glyph->num_points * sizeof(*glyph->x_coordinates));
+		if (!glyph->x_coordinates) {
+			fprintf(stderr, "failed to alloc glyph x coordinates: %s\n", strerror(errno));
+			return 0;
+		}
+		glyph->y_coordinates = (int16_t *) malloc(glyph->num_points * sizeof(*glyph->y_coordinates));
+		if (!glyph->y_coordinates) {
+			fprintf(stderr, "failed to alloc glyph y coordinates: %s\n", strerror(errno));
+			return 0;
+		}
+
+		for (i = 0; i < glyph->instruction_length; i++) {
+			glyph->instructions[i] = read_byte(font->fd);
+		}
+		for (i = 0; i < glyph->num_points; i++) {
+			glyph->flags[i] = read_byte(font->fd);
+			// TODO: handle REPEAT flags
+		}
+
+		for (i = 0; i < glyph->num_points; i++) {
+			// TODO: handle flags
+			glyph->x_coordinates[i] = read_short(font->fd);
+		}
+		for (i = 0; i < glyph->num_points; i++) {
+			// TODO: handle flags
+			glyph->y_coordinates[i] = read_short(font->fd);
+		}
+	} else {
+		// Compound glyph
+		fprintf(stderr, "unsupported compound glyph\n");
+		return 0;
+	}
+
 	return 1;
 }
 
 int load_glyf_table(TTF_Font *font, TTF_Table *table) {
-	glyf_Table *glyf = NULL;
+	glyf_Table *glyf = &table->data.glyf;
 	maxp_Table *maxp = NULL;
 	loca_Table *loca = NULL;
-	// Seek to start of table
-	if (lseek(font->fd, table->offset, SEEK_SET) < 0) {
-		fprintf(stderr, "failed to seek to glyf table: %s\n", strerror(errno));
-		return 0;
-	}
-	glyf = &table->data.glyf;
 
 	// Get maxp and loca tables
 	TTF_Table *temp = get_table(font, s_to_tag("maxp"));
@@ -374,15 +535,18 @@ int load_glyf_table(TTF_Font *font, TTF_Table *table) {
 	}
 	loca = &temp->data.loca;
 
-	glyf->glyphs = (Glyph *) malloc(maxp->num_glyphs * sizeof(Glyph));
+	// Save number of glyphs in glyf table so that the glyph array can be easily accessed
+	glyf->num_glyphs = maxp->num_glyphs;
+
+	glyf->glyphs = (TTF_Glyph *) malloc(glyf->num_glyphs * sizeof(*glyf->glyphs));
 	if (!glyf->glyphs) {
 		fprintf(stderr, "failed to alloc glyphs: %s\n", strerror(errno));
 		return 0;
 	}
 
 	int i;
-	for (i = 0; i < maxp->num_glyphs; i++) {
-		Glyph *glyph = &glyf->glyphs[i];
+	for (i = 0; i < glyf->num_glyphs; i++) {
+		TTF_Glyph *glyph = &glyf->glyphs[i];
 		if (lseek(font->fd, table->offset + loca->offsets[i], SEEK_SET) < 0) {
 			fprintf(stderr, "failed to seek to glyph %d: %s\n", i, strerror(errno));
 			return 0;
@@ -394,13 +558,7 @@ int load_glyf_table(TTF_Font *font, TTF_Table *table) {
 }
 
 int load_head_table(TTF_Font *font, TTF_Table *table) {
-	head_Table *head = NULL;
-	// Seek to start of table
-	if (lseek(font->fd, table->offset, SEEK_SET) < 0) {
-		fprintf(stderr, "failed to seek to head table: %s\n", strerror(errno));
-		return 0;
-	}
-	head = &table->data.head;
+	head_Table *head = &table->data.head;
 
 	head->version = read_fixed(font->fd);
 	head->font_revision = read_fixed(font->fd);
@@ -424,13 +582,7 @@ int load_head_table(TTF_Font *font, TTF_Table *table) {
 }
 
 int load_hhea_table(TTF_Font *font, TTF_Table *table) {
-	hhea_Table *hhea = NULL;
-	// Seek to start of table
-	if (lseek(font->fd, table->offset, SEEK_SET) < 0) {
-		fprintf(stderr, "failed to seek to hhea table: %s\n", strerror(errno));
-		return 0;
-	}
-	hhea = &table->data.hhea;
+	hhea_Table *hhea = &table->data.hhea;
 
 	hhea->version = read_fixed(font->fd);
 	hhea->ascent = read_short(font->fd);
@@ -454,15 +606,9 @@ int load_hhea_table(TTF_Font *font, TTF_Table *table) {
 }
 
 int load_loca_table(TTF_Font *font, TTF_Table *table) {
-	loca_Table *loca = NULL;
+	loca_Table *loca = &table->data.loca;
 	head_Table *head = NULL;
 	maxp_Table *maxp = NULL;
-	// Seek to start of table
-	if (lseek(font->fd, table->offset, SEEK_SET) < 0) {
-		fprintf(stderr, "failed to seek to loca table: %s\n", strerror(errno));
-		return 0;
-	}
-	loca = &table->data.loca;
 
 	// Get head and maxp tables
 	TTF_Table *temp = get_table(font, s_to_tag("head"));
@@ -503,13 +649,7 @@ int load_loca_table(TTF_Font *font, TTF_Table *table) {
 }
 
 int load_maxp_table(TTF_Font *font, TTF_Table *table) {
-	maxp_Table *maxp = NULL;
-	// Seek to start of table
-	if (lseek(font->fd, table->offset, SEEK_SET) < 0) {
-		fprintf(stderr, "failed to seek to maxp table: %s\n", strerror(errno));
-		return 0;
-	}
-	maxp = &table->data.maxp;
+	maxp_Table *maxp = &table->data.maxp;
 
 	maxp->version = read_fixed(font->fd);
 	maxp->num_glyphs = read_ushort(font->fd);
@@ -533,14 +673,8 @@ int load_maxp_table(TTF_Font *font, TTF_Table *table) {
 }
 
 int load_post_table(TTF_Font *font, TTF_Table *table) {
-	post_Table *post = NULL;
+	post_Table *post = &table->data.post;
 	maxp_Table *maxp = NULL;
-	// Seek to start of table
-	if (lseek(font->fd, table->offset, SEEK_SET) < 0) {
-		fprintf(stderr, "failed to seek to post table: %s\n", strerror(errno));
-		return 0;
-	}
-	post = &table->data.post;
 
 	// Get maxp table
 	TTF_Table *temp = get_table(font, s_to_tag("maxp"));
@@ -568,7 +702,7 @@ int load_post_table(TTF_Font *font, TTF_Table *table) {
 int load_tables(TTF_Font *font) {
 	int i;
 	for (i = 0; i < font->num_tables; i++) {
-		TTF_Table *table = font->tables[i];
+		TTF_Table *table = &font->tables[i];
 		if (!table) {
 			continue;
 		}
@@ -579,6 +713,12 @@ int load_tables(TTF_Font *font) {
 		//			int tag, fptr load(), fptr free(),
 		//			...
 		// 		}
+		// Seek to start of table
+		if (lseek(font->fd, table->offset, SEEK_SET) < 0) {
+			fprintf(stderr, "failed to seek to %.*s table: %s\n",
+					TAG_LENGTH, (char *)&(table->tag), strerror(errno));
+			return 0;
+		}
 		switch (table->tag) {
 			case 0x322f534f:	/* OS/2 */
 				break;
@@ -635,11 +775,10 @@ void free_cmap_table(cmap_Table *cmap) {
 	if (cmap->subtables) {
 		int i;
 		for (i = 0; i < cmap->num_subtables; i++) {
-			cmap_subTable *subtable = cmap->subtables[i];
-			if (!subtable) {
-				continue;
+			cmap_subTable *subtable = &cmap->subtables[i];
+			if (subtable && subtable->glyph_index_array) {
+				free(subtable->glyph_index_array);
 			}
-			free(subtable);
 		}
 		free(cmap->subtables);
 	}
@@ -650,6 +789,25 @@ void free_glyf_table(glyf_Table *glyf) {
 		return;
 	}
 	if (glyf->glyphs) {
+		int i;
+		for (i = 0; i < glyf->num_glyphs; i++) {
+			TTF_Glyph *glyph = &glyf->glyphs[i];
+			if (glyph->end_pts_of_contours) {
+				free(glyph->end_pts_of_contours);
+			}
+			if (glyph->flags) {
+				free(glyph->flags);
+			}
+			if (glyph->instructions) {
+				free(glyph->instructions);
+			}
+			if (glyph->x_coordinates) {
+				free(glyph->x_coordinates);
+			}
+			if (glyph->y_coordinates) {
+				free(glyph->y_coordinates);
+			}
+		}
 		free(glyf->glyphs);
 	}
 }
@@ -707,7 +865,6 @@ void free_table(TTF_Table *table) {
 		default:
 			break;
 	}
-	free(table);
 }
 
 void free_font(TTF_Font *font) {
@@ -717,7 +874,7 @@ void free_font(TTF_Font *font) {
 	if (font->tables) {
 		int i;
 		for (i = 0; i < font->num_tables; i++) {
-			TTF_Table *table = font->tables[i];
+			TTF_Table *table = &font->tables[i];
 			free_table(table);
 		}
 		free(font->tables);
@@ -732,7 +889,7 @@ TTF_Table *get_table(TTF_Font *font, uint32_t tag) {
 	if (font->tables) {
 		int i;
 		for (i = 0; i < font->num_tables; i++) {
-			TTF_Table *table = font->tables[i];
+			TTF_Table *table = &font->tables[i];
 			if (table != NULL && table->tag == tag) {
 				return table;
 			}
@@ -772,7 +929,7 @@ TTF_Font *parse_file(const char *filename) {
 	return font;
 }
 
-void debug_print_cmap_table(cmap_Table *cmap) {
+void print_cmap_table(cmap_Table *cmap) {
 	if (!cmap) {
 		return;
 	}
@@ -785,7 +942,7 @@ void debug_print_cmap_table(cmap_Table *cmap) {
 	if (cmap->subtables) {
 		int i;
 		for (i = 0; i < cmap->num_subtables; i++) {
-			cmap_subTable *subtable = cmap->subtables[i];
+			cmap_subTable *subtable = &cmap->subtables[i];
 			if (!subtable) {
 				continue;
 			}
@@ -796,7 +953,17 @@ void debug_print_cmap_table(cmap_Table *cmap) {
 	}
 }
 
-void debug_print_head_table(head_Table *head) {
+void print_glyf_table(glyf_Table *glyf) {
+	if (!glyf) {
+		return;
+	}
+	printf("\ntable: glyf\n");
+	printf("----------------\n");
+
+	// TODO: print out list of glpyhs
+}
+
+void print_head_table(head_Table *head) {
 	if (!head) {
 		return;
 	}
@@ -822,7 +989,7 @@ void debug_print_head_table(head_Table *head) {
 	printf("glyphDataFormat: %hd\n", head->glyph_data_format);
 }
 
-void debug_print_hhea_table(hhea_Table *hhea) {
+void print_hhea_table(hhea_Table *hhea) {
 	if (!hhea) {
 		return;
 	}
@@ -848,25 +1015,28 @@ void debug_print_hhea_table(hhea_Table *hhea) {
 	printf("numOfLongHorMetrics: %hu\n", hhea->num_of_long_hor_metrics);
 }
 
-void debug_print_table(TTF_Table *table) {
+void print_table(TTF_Table *table) {
 	if (!table) {
 		return;
 	}
 	switch (table->tag) {
 		case 0x70616d63:	/* cmap */
-			debug_print_cmap_table(&table->data.cmap);
+			print_cmap_table(&table->data.cmap);
+			break;
+		case 0x66796c67:	/* glyf */
+			print_glyf_table(&table->data.glyf);
 			break;
 		case 0x64616568:	/* head */
-			debug_print_head_table(&table->data.head);
+			print_head_table(&table->data.head);
 			break;
 		case 0x61656868:	/* hhea */
-			debug_print_hhea_table(&table->data.hhea);
+			print_hhea_table(&table->data.hhea);
 		default:
 			break;
 	}
 }
 
-void debug_print_font_dir(TTF_Font *font) {
+void print_font_dir(TTF_Font *font) {
 	if (!font) {
 		return;
 	}
@@ -881,7 +1051,7 @@ void debug_print_font_dir(TTF_Font *font) {
 		printf("----  ----------  ----------  --------\n");
 		int i;
 		for (i = 0; i < font->num_tables; i++) {
-			TTF_Table *table = font->tables[i];
+			TTF_Table *table = &font->tables[i];
 			if (!table) {
 				continue;
 			}
@@ -892,20 +1062,20 @@ void debug_print_font_dir(TTF_Font *font) {
 	}
 }
 
-void debug_print_font(TTF_Font *font) {
+void print_font(TTF_Font *font) {
 	if (!font) {
 		return;
 	}
-	debug_print_font_dir(font);
+	print_font_dir(font);
 
 	if (font->tables) {
 		int i;
 		for (i = 0; i < font->num_tables; i++) {
-			TTF_Table *table = font->tables[i];
+			TTF_Table *table = &font->tables[i];
 			if (!table) {
 				continue;
 			}
-			debug_print_table(table);
+			print_table(table);
 		}
 	}
 }
