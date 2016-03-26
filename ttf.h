@@ -3,59 +3,15 @@
 
 #include <stdint.h>
 
-union _cmap_mappingTable;
 struct _cmap_subTable;
 struct _cmap_Table;
+struct _cvt_Table;
 struct _TTF_Glyph;
 struct _glyf_Table;
 struct _head_Table;
 struct _hhea_Table;
 struct _maxp_Table;
 struct _post_Table;
-
-typedef struct _cmap_format_0 {
-	uint16_t format;
-	uint16_t length;
-	uint16_t language;
-	uint8_t glyph_index_array[256];
-} cmap_format_0;
-
-typedef struct _subheader {
-	uint16_t first_code;
-	uint16_t entry_count;
-	int16_t id_delta;
-	uint16_t id_range_offset;
-} subheader;
-
-typedef struct _cmap_format_2 {
-	uint16_t format;
-	uint16_t length;
-	uint16_t language;
-	uint16_t sub_header_keys[256];
-	subheader *sub_headers;
-	uint16_t glyph_index_array[256];
-} cmap_format_2;
-
-typedef struct _cmap_format_4 {
-	uint16_t format;
-	uint16_t length;
-	uint16_t language;
-	uint16_t seg_count_x2;
-	uint16_t search_range;
-	uint16_t entry_selector;
-	uint16_t range_shift;
-	uint16_t *start_code;
-	uint16_t *id_delta;
-	uint16_t *id_range_offset;
-	uint16_t *glyph_index_array;
-} cmap_format_4;
-
-typedef union _cmap_mappingTable {
-	uint16_t format;
-	cmap_format_0 format_0;
-	cmap_format_2 format_2;
-	cmap_format_4 format_4;
-} cmap_mappingTable;
 
 typedef struct _cmap_subTable {
 	uint16_t platform_id;
@@ -67,8 +23,6 @@ typedef struct _cmap_subTable {
 	uint32_t language;
 
 	uint32_t *glyph_index_array;
-
-	cmap_mappingTable mapping_table;
 } cmap_subTable;
 
 typedef struct _cmap_Table {
@@ -77,6 +31,10 @@ typedef struct _cmap_Table {
 
 	cmap_subTable *subtables;
 } cmap_Table;
+
+typedef struct _cvt_Table {
+	int16_t *control_values;
+} cvt_Table;
 
 typedef struct _TTF_Glyph {
 	int16_t number_of_contours;
@@ -96,6 +54,59 @@ typedef struct _TTF_Glyph {
 
 	// TODO: Compound glyphs
 } TTF_Glyph;
+
+enum {
+	/**
+	 * If set, the point is on the curve;
+	 * Otherwise, it is off the curve.
+	 */
+	ON_CURVE =			1 << 0,
+	/**
+	 * If set, the corresponding x-coordinate is 1 byte long;
+	 * Otherwise, the corresponding x-coordinate is 2 bytes long
+	 */
+	X_SHORT_VECTOR =	1 << 1,
+	/**
+	 * If set, the corresponding y-coordinate is 1 byte long;
+	 * Otherwise, the corresponding y-coordinate is 2 bytes long
+	 */
+	Y_SHORT_VECTOR =	1 << 2,
+	/**
+	 * If set, the next byte specifies the number of additional
+	 * times this set of flags is to be repeated. In this way, the number
+	 * of flags listed can be smaller than the number of points in a character.
+	 */
+	REPEAT =			1 << 3,
+	/**
+	 * This flag has one of two meanings, depending on how the
+	 * x-Short Vector flag is set.
+	 * If the x-Short Vector bit is set, this bit describes the sign
+	 * of the value, with a value of 1 equaling positive and a zero value negative.
+	 *
+	 * If the x-short Vector bit is not set, and this bit is set,
+	 * then the current x-coordinate is the same as the previous x-coordinate.
+	 *
+	 * If the x-short Vector bit is not set, and this bit is not set,
+	 * the current x-coordinate is a signed 16-bit delta vector.
+	 * In this case, the delta vector is the change in x
+	 */
+	X_DUAL =			1 << 4,
+	/**
+	 * This flag has one of two meanings, depending on how the
+	 * y-Short Vector flag is set.
+	 *
+	 * If the y-Short Vector bit is set, this bit describes the sign
+	 * of the value, with a value of 1 equalling positive and a zero value negative.
+	 *
+	 * If the y-short Vector bit is not set, and this bit is set,
+	 * then the current y-coordinate is the same as the previous y-coordinate.
+	 *
+	 * If the y-short Vector bit is not set, and this bit is not set,
+	 * the current y-coordinate is a signed 16-bit delta vector.
+	 * In this case, the delta vector is the change in y
+	 */
+	Y_DUAL =			1 << 5,
+};
 
 typedef struct _glyf_Table {
 	TTF_Glyph *glyphs;
@@ -188,8 +199,10 @@ typedef struct _TTF_Table {
 	uint32_t offset;
 	uint32_t length;
 
+	uint8_t status;
 	union {
 		cmap_Table cmap;
+		cvt_Table cvt;
 		glyf_Table glyf;
 		head_Table head;
 		hhea_Table hhea;
@@ -198,6 +211,15 @@ typedef struct _TTF_Table {
 		post_Table post;
 	} data;
 } TTF_Table;
+
+/**
+ * TTF_Table possible statuses.
+ */
+enum {
+	STATUS_NONE,
+	STATUS_LOADED,
+	STATUS_FREED
+};
 
 typedef struct _TTF_Font {
 	uint32_t scaler_type;
@@ -238,6 +260,8 @@ void free_table(TTF_Table *table);
 void free_font(TTF_Font *font);
 
 TTF_Table *get_table(TTF_Font *font, uint32_t tag);
+TTF_Table *get_table_by_name(TTF_Font *font, const char *name);
+
 TTF_Font *parse_file(const char *filename);
 
 void print_font_dir(TTF_Font *font);
