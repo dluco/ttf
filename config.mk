@@ -5,10 +5,10 @@ VERSION := 0.0.0
 CC := gcc
 
 # C flags
-CFLAGS := -Wall
+CFLAGS := -Wall -Wextra -pedantic -std=c99
 
 # Link flags
-LFLAGS := -Wall
+LFLAGS := -lm
 
 # Strip flags
 SFLAGS := -s

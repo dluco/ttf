@@ -190,7 +190,8 @@ typedef struct _post_Table {
 	uint32_t min_mem_type_1;
 	uint32_t max_mem_type_1;
 
-	char *glyph_names[];
+	uint16_t num_glyphs; /* Read from post table - must match maxp */
+	char **glyph_names;
 } post_Table;
 
 typedef struct _TTF_Table {

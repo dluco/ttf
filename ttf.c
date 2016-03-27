@@ -5,8 +5,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 #include <time.h>
 #include <errno.h>
+#include <limits.h>
 
 // from: http://two.pairlist.net/pipermail/reportlab-users/2003-October/002329.html
 
@@ -108,7 +110,7 @@ int16_t read_short(int fd) {
 uint32_t read_ulong(int fd) {
 	uint32_t w = read_word(fd);
 	uint8_t *b = (uint8_t *)&w;
-	if ((int32_t)b[3] < 0) {
+	if ((int8_t)b[3] < 0) {
 		fprintf(stderr, "read invalid 32-bit unsigned int\n");
 	}
 	return (b[0] << 24) | (b[1] << 16) | (b[2] << 8) | (b[3] << 0);
@@ -750,6 +752,80 @@ int load_post_table(TTF_Font *font, TTF_Table *table) {
 	post->max_mem_type_1 = read_ulong(font->fd);
 
 	// TODO: handle different formats, need MacRomanEncoding
+	
+	switch (post->format) {
+		case 0x00010000:
+			printf("post format: 1\n");
+			break;
+		case 0x00020000:
+			{
+				post->num_glyphs = read_ushort(font->fd);
+
+				uint16_t *glyph_name_index = (uint16_t *) malloc(post->num_glyphs * sizeof(*glyph_name_index));
+				if (!glyph_name_index) {
+					fprintf(stderr, "failed to alloc post glyphNameIndex array: %s\n", strerror(errno));
+					return 0;
+				}
+				uint16_t max_index = 0;
+				int i;
+				for (i = 0; i < post->num_glyphs; i++) {
+					glyph_name_index[i] = read_ushort(font->fd);
+					max_index = (int) fmax(max_index, glyph_name_index[i]);
+				}
+
+				char **names = NULL;
+				if (max_index >= 258) {
+					names = (char **) malloc((max_index-258 + 1) * sizeof(*names));
+					if (!names) {
+						fprintf(stderr, "failed to alloc post names array: %s\n", strerror(errno));
+						return 0;
+					}
+					int i;
+					for (i = 0; i < max_index-258 + 1; i++) {
+						uint8_t name_length = read_byte(font->fd);
+
+						names[i] = (char *) malloc((name_length + 1) * sizeof(*names[i]));
+						if (!names[i]) {
+							fprintf(stderr, "failed to alloc glyph name %d: %s\n", i+258, strerror(errno));
+							return 0;
+						}
+
+						int j;
+						for (j = 0; j < name_length; j++) {
+							names[i][j] = (char) read_byte(font->fd);
+						}
+						names[i][j] = '\0';
+					}
+				}
+
+				post->glyph_names = (char **) malloc(post->num_glyphs * sizeof(*post->glyph_names));
+				if (!post->glyph_names) {
+					fprintf(stderr, "failed to alloc post glyph names: %s\n", strerror(errno));
+					return 0;
+				}
+				for (i = 0; i < post->num_glyphs; i++) {
+					uint16_t index = glyph_name_index[i];
+					if (index < 258) {
+						post->glyph_names[i] = (char *) malloc(4 * sizeof(*post->glyph_names[i]));
+						if (!post->glyph_names[i]) {
+							fprintf(stderr, "failed to alloc glyph name %hu: %s\n", index, strerror(errno));
+							return 0;
+						}
+						// TODO
+					} else if (index >= 258 && index <= 32767) {
+						post->glyph_names[i] = names[index-258];
+					} else {
+						fprintf(stderr, "unknown glyph name index: %hu\n", index);
+					}
+				}
+
+				free(glyph_name_index);
+				free(names);
+			}
+			break;
+		default:
+			break;
+	}
 
 	return 1;
 }
@@ -936,6 +1012,21 @@ void free_maxp_table(maxp_Table *maxp) {
 	}
 }
 
+void free_post_table(post_Table *post) {
+	if (!post) {
+		return;
+	}
+	if (post->glyph_names) {
+		int i;
+		for (i = 0; i < post->num_glyphs; i++) {
+			if (post->glyph_names[i]) {
+				free(post->glyph_names[i]);
+			}
+		}
+		free(post->glyph_names);
+	}
+}
+
 void free_table(TTF_Table *table) {
 	if (!table) {
 		return;
@@ -961,6 +1052,9 @@ void free_table(TTF_Table *table) {
 			break;
 		case 0x7078616d:	/* maxp */
 			free_maxp_table(&table->data.maxp);
+			break;
+		case 0x74736f70:	/* post */
+			free_post_table(&table->data.post);
 			break;
 		default:
 			break;
