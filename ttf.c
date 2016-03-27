@@ -10,59 +10,266 @@
 #include <errno.h>
 #include <limits.h>
 
-// from: http://two.pairlist.net/pipermail/reportlab-users/2003-October/002329.html
-
-// Spike TrueType/OpenType subsetting
-
-// Data Type     Description
-// ------------- -------------------------------------------------------------
-// BYTE          8-bit unsigned integer.
-// CHAR          8-bit signed integer.
-// USHORT        16-bit unsigned integer.
-// SHORT         16-bit signed integer.
-// ULONG         32-bit unsigned integer.
-// LONG          32-bit signed integer.
-// Fixed         32-bit signed fixed-point number (16.16)
-// FUNIT         Smallest measurable distance in the em space.
-// F2DOT14       16-bit signed fixed number with the low 14 bits of fraction (2.14).
-// LONGDATETIME  Date represented in number of seconds since 12:00 midnight, January 1, 1904. The value is represented as a signed 64-bit integer.
-// Tag           Array of four uint8s (length = 32 bits) used to identify a script, language system, feature, or baseline
-// GlyphID       Glyph index number, same as uint16(length = 16 bits)
-// Offset        Offset to a table, same as uint16 (length = 16 bits), NULL offset = 0x0000
-//
-// NOTE: All numbers are big-endian
-
-// Font file begins with an offset table:
-//   Fixed       sfnt version    0x00010000 for TrueType outlines, 'OTTO' for OpenType with CFF outlines (not relevant here)
-//   USHORT      numTables       number of tables
-//   USHORT      searchRange     16 * max(2^n <= numTables)
-//   USHORT      entrySelector   max(n: 2^n <= numTables)
-//   USHORT      rangeShift      numTables * 16 - searchRange
-//   ------------------------------ (12 bytes)
-// Table directory follows.  Each entry is 12 bytes.  Entries are sorted by
-// tag in lexicographical order.  Offsets are from the start of the font file.
-// Entry format:
-//   ULONG       tag             4-byte identifier
-//   ULONG       checkSum        CheckSum for this table
-//   ULONG       offset          Offset from beginning of font file
-//   ULONG       length          length of this table
-
-// Checksum calculation:
-//   ULONG CalcTableChecksum(ULONG *Table, ULONG Length) {
-//   	ULONG Sum = 0L;
-//   	ULONG *Endptr = Table+((Length+3) & ~3) / sizeof(ULONG);
-//
-//   	while (Table < EndPtr)
-//      	Sum += *Table++;
-//       	return Sum;
-//   }
-//
-// Note: This function implies that the length of a table must be a multiple of
-// four bytes. In fact, a font is not considered structurally proper without the
-// correct padding. All tables must begin on four byte boundries, and any
-// remaining space between tables is padded with zeros. The length of all tables
-// should be recorded in the table directory with their actual length (not their
-// padded length).
+const char *mac_encoding[258] = {
+	[0] =	".notdef",
+	[1] =	".null",
+	[2] =	"nonmarkingreturn",
+	[3] =	"space",
+	[4] =	"exclam",
+	[5] =	"quotedbl",
+	[6] =	"numbersign",
+	[7] =	"dollar",
+	[8] =	"percent",
+	[9] =	"ampersand",
+	[10] =	"quotesingle",
+	[11] =	"parenleft",
+	[12] =	"parenright",
+	[13] =	"asterisk",
+	[14] =	"plus",
+	[15] =	"comma",
+	[16] =	"hyphen",
+	[17] =	"period",
+	[18] =	"slash",
+	[19] =	"zero",
+	[20] =	"one",
+	[21] =	"two",
+	[22] =	"three",
+	[23] =	"four",
+	[24] =	"five",
+	[25] =	"six",
+	[26] =	"seven",
+	[27] =	"eight",
+	[28] =	"nine",
+	[29] =	"colon",
+	[30] =	"semicolon",
+	[31] =	"less",
+	[32] =	"equal",
+	[33] =	"greater",
+	[34] =	"question",
+	[35] =	"at",
+	[36] =	"A",
+	[37] =	"B",
+	[38] =	"C",
+	[39] =	"D",
+	[40] =	"E",
+	[41] =	"F",
+	[42] =	"G",
+	[43] =	"H",
+	[44] =	"I",
+	[45] =	"J",
+	[46] =	"K",
+	[47] =	"L",
+	[48] =	"M",
+	[49] =	"N",
+	[50] =	"O",
+	[51] =	"P",
+	[52] =	"Q",
+	[53] =	"R",
+	[54] =	"S",
+	[55] =	"T",
+	[56] =	"U",
+	[57] =	"V",
+	[58] =	"W",
+	[59] =	"X",
+	[60] =	"Y",
+	[61] =	"Z",
+	[62] =	"bracketleft",
+	[63] =	"backslash",
+	[64] =	"bracketright",
+	[65] =	"asciicircum",
+	[66] =	"underscore",
+	[67] =	"grave",
+	[68] =	"a",
+	[69] =	"b",
+	[70] =	"c",
+	[71] =	"d",
+	[72] =	"e",
+	[73] =	"f",
+	[74] =	"g",
+	[75] =	"h",
+	[76] =	"i",
+	[77] =	"j",
+	[78] =	"k",
+	[79] =	"l",
+	[80] =	"m",
+	[81] =	"n",
+	[82] =	"o",
+	[83] =	"p",
+	[84] =	"q",
+	[85] =	"r",
+	[86] =	"s",
+	[87] =	"t",
+	[88] =	"u",
+	[89] =	"v",
+	[90] =	"w",
+	[91] =	"x",
+	[92] =	"y",
+	[93] =	"z",
+	[94] =	"braceleft",
+	[95] =	"bar",
+	[96] =	"braceright",
+	[97] =	"asciitilde",
+	[98] =	"Adieresis",
+	[99] =	"Aring",
+	[100] =	"Ccedilla",
+	[101] =	"Eacute",
+	[102] =	"Ntilde",
+	[103] =	"Odieresis",
+	[104] =	"Udieresis",
+	[105] =	"aacute",
+	[106] =	"agrave",
+	[107] =	"acircumflex",
+	[108] =	"adieresis",
+	[109] =	"atilde",
+	[110] =	"aring",
+	[111] =	"ccedilla",
+	[112] =	"eacute",
+	[113] =	"egrave",
+	[114] =	"ecircumflex",
+	[115] =	"edieresis",
+	[116] =	"iacute",
+	[117] =	"igrave",
+	[118] =	"icircumflex",
+	[119] =	"idieresis",
+	[120] =	"ntilde",
+	[121] =	"oacute",
+	[122] =	"ograve",
+	[123] =	"ocircumflex",
+	[124] =	"odieresis",
+	[125] =	"otilde",
+	[126] =	"uacute",
+	[127] =	"ugrave",
+	[128] =	"ucircumflex",
+	[129] =	"udieresis",
+	[130] =	"dagger",
+	[131] =	"degree",
+	[132] =	"cent",
+	[133] =	"sterling",
+	[134] =	"section",
+	[135] =	"bullet",
+	[136] =	"paragraph",
+	[137] =	"germandbls",
+	[138] =	"registered",
+	[139] =	"copyright",
+	[140] =	"trademark",
+	[141] =	"acute",
+	[142] =	"dieresis",
+	[143] =	"notequal",
+	[144] =	"AE",
+	[145] =	"Oslash",
+	[146] =	"infinity",
+	[147] =	"plusminus",
+	[148] =	"lessequal",
+	[149] =	"greaterequal",
+	[150] =	"yen",
+	[151] =	"mu",
+	[152] =	"partialdiff",
+	[153] =	"summation",
+	[154] =	"product",
+	[155] =	"pi",
+	[156] =	"integral",
+	[157] =	"ordfeminine",
+	[158] =	"ordmasculine",
+	[159] =	"Omega",
+	[160] =	"ae",
+	[161] =	"oslash",
+	[162] =	"questiondown",
+	[163] =	"exclamdown",
+	[164] =	"logicalnot",
+	[165] =	"radical",
+	[166] =	"florin",
+	[167] =	"approxequal",
+	[168] =	"Delta",
+	[169] =	"guillemotleft",
+	[170] =	"guillemotright",
+	[171] =	"ellipsis",
+	[172] =	"nonbreakingspace",
+	[173] =	"Agrave",
+	[174] =	"Atilde",
+	[175] =	"Otilde",
+	[176] =	"OE",
+	[177] =	"oe",
+	[178] =	"endash",
+	[179] =	"emdash",
+	[180] =	"quotedblleft",
+	[181] =	"quotedblright",
+	[182] =	"quoteleft",
+	[183] =	"quoteright",
+	[184] =	"divide",
+	[185] =	"lozenge",
+	[186] =	"ydieresis",
+	[187] =	"Ydieresis",
+	[188] =	"fraction",
+	[189] =	"currency",
+	[190] =	"guilsinglleft",
+	[191] =	"guilsinglright",
+	[192] =	"fi",
+	[193] =	"fl",
+	[194] =	"daggerdbl",
+	[195] =	"periodcentered",
+	[196] =	"quotesinglbase",
+	[197] =	"quotedblbase",
+	[198] =	"perthousand",
+	[199] =	"Acircumflex",
+	[200] =	"Ecircumflex",
+	[201] =	"Aacute",
+	[202] =	"Edieresis",
+	[203] =	"Egrave",
+	[204] =	"Iacute",
+	[205] =	"Icircumflex",
+	[206] =	"Idieresis",
+	[207] =	"Igrave",
+	[208] =	"Oacute",
+	[209] =	"Ocircumflex",
+	[210] =	"apple",
+	[211] =	"Ograve",
+	[212] =	"Uacute",
+	[213] =	"Ucircumflex",
+	[214] =	"Ugrave",
+	[215] =	"dotlessi",
+	[216] =	"circumflex",
+	[217] =	"tilde",
+	[218] =	"macron",
+	[219] =	"breve",
+	[220] =	"dotaccent",
+	[221] =	"ring",
+	[222] =	"cedilla",
+	[223] =	"hungarumlaut",
+	[224] =	"ogonek",
+	[225] =	"caron",
+	[226] =	"Lslash",
+	[227] =	"lslash",
+	[228] =	"Scaron",
+	[229] =	"scaron",
+	[230] =	"Zcaron",
+	[231] =	"zcaron",
+	[232] =	"brokenbar",
+	[233] =	"Eth",
+	[234] =	"eth",
+	[235] =	"Yacute",
+	[236] =	"yacute",
+	[237] =	"Thorn",
+	[238] =	"thorn",
+	[239] =	"minus",
+	[240] =	"multiply",
+	[241] =	"onesuperior",
+	[242] =	"twosuperior",
+	[243] =	"threesuperior",
+	[244] =	"onehalf",
+	[245] =	"onequarter",
+	[246] =	"threequarters",
+	[247] =	"franc",
+	[248] =	"Gbreve",
+	[249] =	"gbreve",
+	[250] =	"Idotaccent",
+	[251] =	"Scedilla",
+	[252] =	"scedilla",
+	[253] =	"Cacute",
+	[254] =	"cacute",
+	[255] =	"Ccaron",
+	[256] =	"ccaron",
+	[257] =	"dcroat"
+};
 
 uint8_t read_byte(int fd) {
 	uint8_t b;
@@ -751,14 +958,31 @@ int load_post_table(TTF_Font *font, TTF_Table *table) {
 	post->min_mem_type_1 = read_ulong(font->fd);
 	post->max_mem_type_1 = read_ulong(font->fd);
 
-	// TODO: handle different formats, need MacRomanEncoding
-	
 	switch (post->format) {
 		case 0x00010000:
-			printf("post format: 1\n");
+			{
+				// Font contains exactly the 258 glyphs in the standard Macintosh ordering.
+				post->num_glyphs = 258;
+
+				post->glyph_names = (char **) malloc(post->num_glyphs * sizeof(*post->glyph_names));
+				if (!post->glyph_names) {
+					fprintf(stderr, "failed to alloc post glyph names: %s\n", strerror(errno));
+					return 0;
+				}
+				int i;
+				for (i = 0; i < post->num_glyphs; i++) {
+					post->glyph_names[i] = (char *) malloc(strlen(mac_encoding[i]) * sizeof(*post->glyph_names[i]));
+					if (!post->glyph_names) {
+						fprintf(stderr, "failed to alloc glyph name %d: %s\n", i, strerror(errno));
+						return 0;
+					}
+					strcpy(post->glyph_names[i], mac_encoding[i]);
+				}
+			}
 			break;
 		case 0x00020000:
 			{
+				// Font contains some glyphs not in the standard set or its glyph ordering is non-standard.
 				post->num_glyphs = read_ushort(font->fd);
 
 				uint16_t *glyph_name_index = (uint16_t *) malloc(post->num_glyphs * sizeof(*glyph_name_index));
@@ -806,12 +1030,13 @@ int load_post_table(TTF_Font *font, TTF_Table *table) {
 				for (i = 0; i < post->num_glyphs; i++) {
 					uint16_t index = glyph_name_index[i];
 					if (index < 258) {
-						post->glyph_names[i] = (char *) malloc(4 * sizeof(*post->glyph_names[i]));
+						// Glyph name is mac_encoding[index]
+						post->glyph_names[i] = (char *) malloc(strlen(mac_encoding[index]) * sizeof(*post->glyph_names[i]));
 						if (!post->glyph_names[i]) {
 							fprintf(stderr, "failed to alloc glyph name %hu: %s\n", index, strerror(errno));
 							return 0;
 						}
-						// TODO
+						strcpy(post->glyph_names[i], mac_encoding[index]);
 					} else if (index >= 258 && index <= 32767) {
 						post->glyph_names[i] = names[index-258];
 					} else {
@@ -823,7 +1048,45 @@ int load_post_table(TTF_Font *font, TTF_Table *table) {
 				free(names);
 			}
 			break;
+		case 0x00025000:
+			{
+				// Font contains a pure subset of the standard glyph set or a reordering of the standard set.
+				post->num_glyphs = maxp->num_glyphs;
+
+				uint16_t *glyph_name_index = (uint16_t *) malloc(post->num_glyphs * sizeof(*glyph_name_index));
+				if (!glyph_name_index) {
+					fprintf(stderr, "failed to alloc post glyphNameIndex array: %s\n", strerror(errno));
+					return 0;
+				}
+
+				int i;
+				for (i = 0; i < post->num_glyphs; i++) {
+					int8_t offset = (int8_t) read_byte(font->fd);
+					glyph_name_index[i] = offset + (i+1);
+				}
+
+				post->glyph_names = (char **) malloc(post->num_glyphs * sizeof(*post->glyph_names));
+				if (!post->glyph_names) {
+					fprintf(stderr, "failed to alloc post glyph names: %s\n", strerror(errno));
+					return 0;
+				}
+
+				for (i = 0; i < post->num_glyphs; i++) {
+					uint16_t index = glyph_name_index[i];
+					post->glyph_names[i] = (char *) malloc(strlen(mac_encoding[index]) * sizeof(*post->glyph_names[i]));
+					if (!post->glyph_names) {
+						fprintf(stderr, "failed to alloc glyph name %d: %s\n", index, strerror(errno));
+						return 0;
+					}
+					strcpy(post->glyph_names[i], mac_encoding[index]);
+				}
+
+				free(glyph_name_index);
+			}
+			break;
+		case 0x00030000:
 		default:
+			// No postscript information provided
 			break;
 	}
 
@@ -888,8 +1151,7 @@ int load_tables(TTF_Font *font) {
 	if (!font) {
 		return 0;
 	}
-	int i;
-	char *required_tables[] = {
+	const char *required_tables[] = {
 		"head",
 		"hhea",
 		"maxp",
@@ -897,6 +1159,7 @@ int load_tables(TTF_Font *font) {
 		"loca",
 		NULL
 	};
+	int i;
 	// Load several required tables in order
 	for (i = 0; required_tables[i] != NULL; i++) {
 		TTF_Table *table = get_table_by_name(font, required_tables[i]);
