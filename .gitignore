@@ -1,4 +1,5 @@
 *.o
+*.do
 *.d
 ttf
 ttf-debug

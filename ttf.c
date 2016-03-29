@@ -1,4 +1,5 @@
 #include "ttf.h"
+#include "utils.h"
 #include <fcntl.h>
 #include <unistd.h>
 #include <stdint.h>
@@ -7,7 +8,6 @@
 #include <string.h>
 #include <math.h>
 #include <time.h>
-#include <errno.h>
 #include <limits.h>
 
 const char *mac_encoding[258] = {
@@ -274,7 +274,7 @@ const char *mac_encoding[258] = {
 uint8_t read_byte(int fd) {
 	uint8_t b;
 	if (read(fd, &b, sizeof(uint8_t)) < 0) {
-		fprintf(stderr, "failed to read byte: %s\n", strerror(errno));
+		warnerr("failed to read byte");
 	}
 	return b;
 }
@@ -282,7 +282,7 @@ uint8_t read_byte(int fd) {
 uint16_t read_hword(int fd) {
 	uint16_t hw;
 	if (read(fd, &hw, sizeof(uint16_t)) < 0) {
-		fprintf(stderr, "failed to read hword: %s\n", strerror(errno));
+		warnerr("failed to read hword");
 	}
 	return hw;
 }
@@ -290,7 +290,7 @@ uint16_t read_hword(int fd) {
 uint32_t read_word(int fd) {
 	uint32_t w;
 	if (read(fd, &w, sizeof(uint32_t)) < 0) {
-		fprintf(stderr, "failed to read word: %s\n", strerror(errno));
+		warnerr("failed to read word");
 	}
 	return w;
 }
@@ -298,7 +298,7 @@ uint32_t read_word(int fd) {
 uint64_t read_dword(int fd) {
 	uint64_t dw;
 	if (read(fd, &dw, sizeof(uint64_t)) < 0) {
-		fprintf(stderr, "failed to read dword: %s\n", strerror(errno));
+		warnerr("failed to read dword");
 	}
 	return dw;
 }
@@ -317,9 +317,6 @@ int16_t read_short(int fd) {
 uint32_t read_ulong(int fd) {
 	uint32_t w = read_word(fd);
 	uint8_t *b = (uint8_t *)&w;
-	if ((int8_t)b[3] < 0) {
-		fprintf(stderr, "read invalid 32-bit unsigned int\n");
-	}
 	return (b[0] << 24) | (b[1] << 16) | (b[2] << 8) | (b[3] << 0);
 }
 
@@ -355,7 +352,7 @@ uint32_t s_to_tag(const char *s) {
 int read_font_dir(TTF_Font *font) {
 	// Seek to start of file
 	if (lseek(font->fd, 0, SEEK_SET) < 0) {
-		fprintf(stderr, "failed to seek to font dir: %s\n", strerror(errno));
+		warnerr("failed to seek to font dir");
 		return 0;
 	}
 
@@ -368,7 +365,7 @@ int read_font_dir(TTF_Font *font) {
 
 	// Ensure that 12 bytes have been read
 	if (lseek(font->fd, 0, SEEK_CUR) != 12) {
-		fprintf(stderr, "incorrect number of bytes in offset subtable\n");
+		warn("incorrect number of bytes in offset subtable");
 		return 0;
 	}
 
@@ -378,7 +375,7 @@ int read_font_dir(TTF_Font *font) {
 	 */
 	font->tables = (TTF_Table *) calloc(font->num_tables, sizeof(*font->tables));
 	if (!font->tables) {
-		fprintf(stderr, "failed to alloc font tables: %s\n", strerror(errno));
+		warnerr("failed to alloc font tables");
 		return 0;
 	}
 
@@ -401,7 +398,7 @@ int read_font_dir(TTF_Font *font) {
 int read_table_raw(TTF_Font *font, TTF_Table *table, uint32_t *buf) {
 	// Seek to start of table
 	if (lseek(font->fd, table->offset, SEEK_SET) < 0) {
-		fprintf(stderr, "failed to seek to font table: %s\n", strerror(errno));
+		warnerr("failed to seek to font table");
 		return 0;
 	}
 
@@ -413,7 +410,7 @@ int read_table_raw(TTF_Font *font, TTF_Table *table, uint32_t *buf) {
 	// Read n_bytes from the font file descriptor
 	while (bytes_read < (ssize_t)n_bytes) {
 		if ((bytes_read = read(font->fd, p, bytes_left)) < 0) {
-			fprintf(stderr, "failed to read raw table: %s\n", strerror(errno));
+			warnerr("failed to read raw table");
 			break;
 		}
 		p += bytes_read;
@@ -444,7 +441,7 @@ int validate_check_sums(TTF_Font *font) {
 		}
 		uint32_t *data = (uint32_t *) malloc(table->length);
 		if (!data) {
-			fprintf(stderr, "failed to alloc raw table data: %s\n", strerror(errno));
+			warnerr("failed to alloc raw table data");
 			return 0;
 		}
 		if (!read_table_raw(font, table, data)) {
@@ -452,10 +449,10 @@ int validate_check_sums(TTF_Font *font) {
 		}
 		uint32_t sum = calc_table_check_sum(data, table->length);
 		if (sum != table->check_sum) {
-			fprintf(stderr, "table '%.*s' data does not match check sum\n",
+			warn("table '%.*s' data does not match check sum",
 					TAG_LENGTH, (char *)&(table->tag));
-			fprintf(stderr, "sum = %08x\n", sum);
-			fprintf(stderr, "check sum = %08x\n", table->check_sum);
+			warn("sum = %08x", sum);
+			warn("check sum = %08x", table->check_sum);
 			return 0;
 		}
 		free(data);
@@ -464,15 +461,11 @@ int validate_check_sums(TTF_Font *font) {
 }
 
 int load_cmap_subtable(TTF_Font *font, cmap_subTable *subtable) {
-	maxp_Table *maxp = NULL;
-
-	// Get maxp table
-	TTF_Table *temp = get_table_by_name(font, "maxp");
-	if (!temp) {
-		fprintf(stderr, "failed to get maxp table\n");
+	maxp_Table *maxp = get_maxp_table(font);
+	if (!maxp) {
+		warn("failed to get maxp table");
 		return 0;
 	}
-	maxp = &temp->data.maxp;
 
 	subtable->format = read_ushort(font->fd);
 	if (subtable->format < 8) {
@@ -486,9 +479,11 @@ int load_cmap_subtable(TTF_Font *font, cmap_subTable *subtable) {
 	switch (subtable->format) {
 		case 0:
 			{
+				subtable->num_indices = 256;
+
 				subtable->glyph_index_array = (uint32_t *) malloc(256 * sizeof(*subtable->glyph_index_array));
 				if (!subtable->glyph_index_array) {
-					fprintf(stderr, "failed to alloc cmap format 0 glyph index array: %s\n", strerror(errno));
+					warnerr("failed to alloc cmap format 0 glyph index array");
 					return 0;
 				}
 				int i;
@@ -502,29 +497,35 @@ int load_cmap_subtable(TTF_Font *font, cmap_subTable *subtable) {
 			{
 				int i;
 				uint16_t seg_count = read_ushort(font->fd) / 2;
-				uint16_t search_range = read_ushort(font->fd);
-				uint16_t entry_selector = read_ushort(font->fd);
-				uint16_t range_shift = read_ushort(font->fd);
+//				uint16_t search_range = read_ushort(font->fd);
+//				uint16_t entry_selector = read_ushort(font->fd);
+//				uint16_t range_shift = read_ushort(font->fd);
+
+				// Skip next 3 hwords
+				if (lseek(font->fd, 3 * sizeof(uint16_t), SEEK_CUR) < 0) {
+					warnerr("failed to seek in cmap subtable format 4");
+					return 0;
+				}
 
 				// Alloc arrays
 				uint16_t *end_code = (uint16_t *) malloc(seg_count * sizeof(*end_code));
 				if (!end_code) {
-					fprintf(stderr, "failed to alloc cmap format 4 endCode array: %s\n", strerror(errno));
+					warnerr("failed to alloc cmap format 4 endCode array");
 					return 0;
 				}
 				uint16_t *start_code = (uint16_t *) malloc(seg_count * sizeof(*start_code));
 				if (!start_code) {
-					fprintf(stderr, "failed to alloc cmap format 4 startCode array: %s\n", strerror(errno));
+					warnerr("failed to alloc cmap format 4 startCode array");
 					return 0;
 				}
 				uint16_t *id_delta = (uint16_t *) malloc(seg_count * sizeof(*id_delta));
 				if (!id_delta) {
-					fprintf(stderr, "failed to alloc cmap format 4 idDelta array: %s\n", strerror(errno));
+					warnerr("failed to alloc cmap format 4 idDelta array");
 					return 0;
 				}
 				uint16_t *id_range_offset = (uint16_t *) malloc(seg_count * sizeof(*id_range_offset));
 				if (!id_range_offset) {
-					fprintf(stderr, "failed to alloc cmap format 4 idRangeOffset array: %s\n", strerror(errno));
+					warnerr("failed to alloc cmap format 4 idRangeOffset array");
 					return 0;
 				}
 
@@ -532,7 +533,12 @@ int load_cmap_subtable(TTF_Font *font, cmap_subTable *subtable) {
 				for (i = 0; i < seg_count; i++) {
 					end_code[i] = read_ushort(font->fd);
 				}
-				uint16_t reserved_pad = read_ushort(font->fd);
+//				uint16_t reserved_pad = read_ushort(font->fd);
+				// Skip one hword
+				if (lseek(font->fd, sizeof(uint16_t), SEEK_CUR) < 0) {
+					warnerr("failed to seek in cmap subtable");
+					return 0;
+				}
 				for (i = 0; i < seg_count; i++) {
 					start_code[i] = read_ushort(font->fd);
 				}
@@ -543,16 +549,18 @@ int load_cmap_subtable(TTF_Font *font, cmap_subTable *subtable) {
 					id_range_offset[i] = read_ushort(font->fd);
 				}
 
+				subtable->num_indices = maxp->num_glyphs;
+
 				/* Alloc with calloc to ensure that all glyphs point to 0 by default. */
 				subtable->glyph_index_array = (uint32_t *) calloc(maxp->num_glyphs, sizeof(*subtable->glyph_index_array));
 				if (!subtable->glyph_index_array) {
-					fprintf(stderr, "failed to alloc cmap format 4 glyph index array: %s\n", strerror(errno));
+					warnerr("failed to alloc cmap format 4 glyph index array");
 					return 0;
 				}
 
 				off_t cur_pos;
 				if ((cur_pos = lseek(font->fd, 0, SEEK_CUR)) < 0) {
-					fprintf(stderr, "failed to get file position: %s\n", strerror(errno));
+					warnerr("failed to get file position");
 					return 0;
 				}
 
@@ -571,7 +579,7 @@ int load_cmap_subtable(TTF_Font *font, cmap_subTable *subtable) {
 								uint32_t glyph_offset = cur_pos +
 									((range_offset/2) + (j-start) + (i-seg_count))*2;
 								if (lseek(font->fd, glyph_offset, SEEK_SET) < 0) {
-									fprintf(stderr, "failed to seek to glyph offset: %s\n", strerror(errno));
+									warnerr("failed to seek to glyph offset");
 									return 0;
 								}
 								uint16_t glyph_index = read_ushort(font->fd);
@@ -586,11 +594,10 @@ int load_cmap_subtable(TTF_Font *font, cmap_subTable *subtable) {
 					}
 				}
 
-				// FIXME: remove
-				search_range = 0;
-				entry_selector = 0;
-				range_shift = 0;
-				reserved_pad = 0;
+//				search_range = 0;
+//				entry_selector = 0;
+//				range_shift = 0;
+//				reserved_pad = 0;
 
 				free(end_code);
 				free(start_code);
@@ -599,7 +606,8 @@ int load_cmap_subtable(TTF_Font *font, cmap_subTable *subtable) {
 			}
 			break;
 		default:
-			fprintf(stderr, "unsupported cmap subtable format: %u\n", subtable->format);
+			warn("unsupported cmap subtable format: %u", subtable->format);
+			subtable->num_indices = 0;
 			return 0;
 	}
 
@@ -614,7 +622,7 @@ int load_cmap_table(TTF_Font *font, TTF_Table *table) {
 
 	cmap->subtables = (cmap_subTable *) malloc(cmap->num_subtables * sizeof(*cmap->subtables));
 	if (!cmap->subtables) {
-		fprintf(stderr, "failed to alloc cmap subtables: %s\n", strerror(errno));
+		warnerr("failed to alloc cmap subtables");
 		return 0;
 	}
 
@@ -629,13 +637,13 @@ int load_cmap_table(TTF_Font *font, TTF_Table *table) {
 
 		// Save current file position
 		if ((pos = lseek(font->fd, 0, SEEK_CUR)) < 0) {
-			fprintf(stderr, "failed to save file position: %s\n", strerror(errno));
+			warnerr("failed to save file position");
 			return 0;
 		}
 
 		// Seek to start of mapping subtable (relative to cmap table offset)
 		if (lseek(font->fd, table->offset + subtable->offset, SEEK_SET) < 0) {
-			fprintf(stderr, "failed to seek to cmap mapping subtable: %s\n", strerror(errno));
+			warnerr("failed to seek to cmap mapping subtable");
 			return 0;
 		}
 
@@ -643,7 +651,7 @@ int load_cmap_table(TTF_Font *font, TTF_Table *table) {
 
 		// Restore file position
 		if (lseek(font->fd, pos, SEEK_SET) < 0) {
-			fprintf(stderr, "failed to restore file position: %s\n", strerror(errno));
+			warnerr("failed to restore file position");
 			return 0;
 		}
 	}
@@ -657,7 +665,7 @@ int load_cvt_table(TTF_Font *font, TTF_Table *table) {
 	int num_values = table->length / 4;
 	cvt->control_values = (int16_t *) malloc(num_values * sizeof(*cvt->control_values));
 	if (!cvt->control_values) {
-		fprintf(stderr, "failed to alloc control values: %s\n", strerror(errno));
+		warnerr("failed to alloc control values");
 		return 0;
 	}
 
@@ -683,7 +691,7 @@ int load_glyph(TTF_Font *font, TTF_Glyph *glyph) {
 		// Simple glyph
 		glyph->end_pts_of_contours = (uint16_t *) malloc(glyph->number_of_contours * sizeof(*glyph->end_pts_of_contours));
 		if (!glyph->end_pts_of_contours) {
-			fprintf(stderr, "failed to alloc glyph end points: %s\n", strerror(errno));
+			warnerr("failed to alloc glyph end points");
 			return 0;
 		}
 		int i;
@@ -704,23 +712,23 @@ int load_glyph(TTF_Font *font, TTF_Glyph *glyph) {
 
 		glyph->instructions = (uint8_t *) malloc(glyph->instruction_length * sizeof(*glyph->instructions));
 		if (!glyph->instructions) {
-			fprintf(stderr, "failed to alloc glyph instructions: %s\n", strerror(errno));
+			warnerr("failed to alloc glyph instructions");
 			return 0;
 		}
 
 		glyph->flags = (uint8_t *) malloc(glyph->num_points * sizeof(*glyph->flags));
 		if (!glyph->flags) {
-			fprintf(stderr, "failed to alloc glyph flags: %s\n", strerror(errno));
+			warnerr("failed to alloc glyph flags");
 			return 0;
 		}
 		glyph->x_coordinates = (int16_t *) malloc(glyph->num_points * sizeof(*glyph->x_coordinates));
 		if (!glyph->x_coordinates) {
-			fprintf(stderr, "failed to alloc glyph x coordinates: %s\n", strerror(errno));
+			warnerr("failed to alloc glyph x coordinates");
 			return 0;
 		}
 		glyph->y_coordinates = (int16_t *) malloc(glyph->num_points * sizeof(*glyph->y_coordinates));
 		if (!glyph->y_coordinates) {
-			fprintf(stderr, "failed to alloc glyph y coordinates: %s\n", strerror(errno));
+			warnerr("failed to alloc glyph y coordinates");
 			return 0;
 		}
 
@@ -771,7 +779,7 @@ int load_glyph(TTF_Font *font, TTF_Glyph *glyph) {
 		}
 	} else {
 		// Compound glyph
-//		fprintf(stderr, "unsupported compound glyph\n");
+//		warn("unsupported compound glyph");
 		return 0;
 	}
 
@@ -780,22 +788,18 @@ int load_glyph(TTF_Font *font, TTF_Glyph *glyph) {
 
 int load_glyf_table(TTF_Font *font, TTF_Table *table) {
 	glyf_Table *glyf = &table->data.glyf;
-	maxp_Table *maxp = NULL;
-	loca_Table *loca = NULL;
 
 	// Get maxp and loca tables
-	TTF_Table *temp = get_table_by_name(font, "maxp");
-	if (!temp) {
-		fprintf(stderr, "failed to get maxp table\n");
+	maxp_Table *maxp = get_maxp_table(font);
+	if (!maxp) {
+		warn("failed to get maxp table");
 		return 0;
 	}
-	maxp = &temp->data.maxp;
-	temp = get_table_by_name(font, "loca");
-	if (!temp) {
-		fprintf(stderr, "failed to get loca table\n");
+	loca_Table *loca = get_loca_table(font);
+	if (!loca) {
+		warn("failed to get loca table");
 		return 0;
 	}
-	loca = &temp->data.loca;
 
 	// Save number of glyphs in glyf table so that the glyph array can be easily accessed
 	glyf->num_glyphs = maxp->num_glyphs;
@@ -806,7 +810,7 @@ int load_glyf_table(TTF_Font *font, TTF_Table *table) {
 	 */
 	glyf->glyphs = (TTF_Glyph *) calloc(glyf->num_glyphs, sizeof(*glyf->glyphs));
 	if (!glyf->glyphs) {
-		fprintf(stderr, "failed to alloc glyphs: %s\n", strerror(errno));
+		warnerr("failed to alloc glyphs");
 		return 0;
 	}
 
@@ -814,7 +818,7 @@ int load_glyf_table(TTF_Font *font, TTF_Table *table) {
 	for (i = 0; i < glyf->num_glyphs; i++) {
 		TTF_Glyph *glyph = &glyf->glyphs[i];
 		if (lseek(font->fd, table->offset + loca->offsets[i], SEEK_SET) < 0) {
-			fprintf(stderr, "failed to seek to glyph %d: %s\n", i, strerror(errno));
+			warnerr("failed to seek to glyph %d: %s", i);
 			return 0;
 		}
 		load_glyph(font, glyph);
@@ -873,26 +877,22 @@ int load_hhea_table(TTF_Font *font, TTF_Table *table) {
 
 int load_loca_table(TTF_Font *font, TTF_Table *table) {
 	loca_Table *loca = &table->data.loca;
-	head_Table *head = NULL;
-	maxp_Table *maxp = NULL;
 
 	// Get head and maxp tables
-	TTF_Table *temp = get_table_by_name(font, "head");
-	if (!temp) {
-		fprintf(stderr, "failed to get head table\n");
+	head_Table *head = get_head_table(font);
+	if (!head) {
+		warn("failed to get head table");
 		return 0;
 	}
-	head = &temp->data.head;
-	temp = get_table_by_name(font, "maxp");
-	if (!temp) {
-		fprintf(stderr, "failed to get maxp table\n");
+	maxp_Table *maxp = get_maxp_table(font);
+	if (!maxp) {
+		warn("failed to get maxp table");
 		return 0;
 	}
-	maxp = &temp->data.maxp;
 
 	loca->offsets = (uint32_t *) malloc((maxp->num_glyphs + 1) * sizeof(*loca->offsets));
 	if (!loca->offsets) {
-		fprintf(stderr, "failed to alloc loca offsets: %s\n", strerror(errno));
+		warnerr("failed to alloc loca offsets");
 		return 0;
 	}
 
@@ -906,7 +906,7 @@ int load_loca_table(TTF_Font *font, TTF_Table *table) {
 				loca->offsets[i] = read_ulong(font->fd);
 				break;
 			default:
-				fprintf(stderr, "unknown loca offset format: %hd\n", head->index_to_loc_format);
+				warn("unknown loca offset format: %hd", head->index_to_loc_format);
 				return 0;
 		}
 	}
@@ -938,15 +938,13 @@ int load_maxp_table(TTF_Font *font, TTF_Table *table) {
 
 int load_post_table(TTF_Font *font, TTF_Table *table) {
 	post_Table *post = &table->data.post;
-	maxp_Table *maxp = NULL;
 
 	// Get maxp table
-	TTF_Table *temp = get_table_by_name(font, "maxp");
-	if (!temp) {
-		fprintf(stderr, "failed to get maxp table\n");
+	maxp_Table *maxp = get_maxp_table(font);
+	if (!maxp) {
+		warn("failed to get maxp table");
 		return 0;
 	}
-	maxp = &temp->data.maxp;
 
 	post->format = read_fixed(font->fd);
 	post->italic_angle = read_fixed(font->fd);
@@ -966,14 +964,14 @@ int load_post_table(TTF_Font *font, TTF_Table *table) {
 
 				post->glyph_names = (char **) malloc(post->num_glyphs * sizeof(*post->glyph_names));
 				if (!post->glyph_names) {
-					fprintf(stderr, "failed to alloc post glyph names: %s\n", strerror(errno));
+					warnerr("failed to alloc post glyph names");
 					return 0;
 				}
 				int i;
 				for (i = 0; i < post->num_glyphs; i++) {
 					post->glyph_names[i] = (char *) malloc(strlen(mac_encoding[i]) * sizeof(*post->glyph_names[i]));
 					if (!post->glyph_names) {
-						fprintf(stderr, "failed to alloc glyph name %d: %s\n", i, strerror(errno));
+						warnerr("failed to alloc glyph name %d: %s", i);
 						return 0;
 					}
 					strcpy(post->glyph_names[i], mac_encoding[i]);
@@ -987,7 +985,7 @@ int load_post_table(TTF_Font *font, TTF_Table *table) {
 
 				uint16_t *glyph_name_index = (uint16_t *) malloc(post->num_glyphs * sizeof(*glyph_name_index));
 				if (!glyph_name_index) {
-					fprintf(stderr, "failed to alloc post glyphNameIndex array: %s\n", strerror(errno));
+					warnerr("failed to alloc post glyphNameIndex array");
 					return 0;
 				}
 				uint16_t max_index = 0;
@@ -1001,7 +999,7 @@ int load_post_table(TTF_Font *font, TTF_Table *table) {
 				if (max_index >= 258) {
 					names = (char **) malloc((max_index-258 + 1) * sizeof(*names));
 					if (!names) {
-						fprintf(stderr, "failed to alloc post names array: %s\n", strerror(errno));
+						warnerr("failed to alloc post names array");
 						return 0;
 					}
 					int i;
@@ -1010,7 +1008,7 @@ int load_post_table(TTF_Font *font, TTF_Table *table) {
 
 						names[i] = (char *) malloc((name_length + 1) * sizeof(*names[i]));
 						if (!names[i]) {
-							fprintf(stderr, "failed to alloc glyph name %d: %s\n", i+258, strerror(errno));
+							warnerr("failed to alloc glyph name %d: %s", i+258);
 							return 0;
 						}
 
@@ -1024,7 +1022,7 @@ int load_post_table(TTF_Font *font, TTF_Table *table) {
 
 				post->glyph_names = (char **) malloc(post->num_glyphs * sizeof(*post->glyph_names));
 				if (!post->glyph_names) {
-					fprintf(stderr, "failed to alloc post glyph names: %s\n", strerror(errno));
+					warnerr("failed to alloc post glyph names");
 					return 0;
 				}
 				for (i = 0; i < post->num_glyphs; i++) {
@@ -1033,14 +1031,14 @@ int load_post_table(TTF_Font *font, TTF_Table *table) {
 						// Glyph name is mac_encoding[index]
 						post->glyph_names[i] = (char *) malloc(strlen(mac_encoding[index]) * sizeof(*post->glyph_names[i]));
 						if (!post->glyph_names[i]) {
-							fprintf(stderr, "failed to alloc glyph name %hu: %s\n", index, strerror(errno));
+							warnerr("failed to alloc glyph name %hu: %s", index);
 							return 0;
 						}
 						strcpy(post->glyph_names[i], mac_encoding[index]);
 					} else if (index >= 258 && index <= 32767) {
 						post->glyph_names[i] = names[index-258];
 					} else {
-						fprintf(stderr, "unknown glyph name index: %hu\n", index);
+						warn("unknown glyph name index: %hu", index);
 					}
 				}
 
@@ -1055,7 +1053,7 @@ int load_post_table(TTF_Font *font, TTF_Table *table) {
 
 				uint16_t *glyph_name_index = (uint16_t *) malloc(post->num_glyphs * sizeof(*glyph_name_index));
 				if (!glyph_name_index) {
-					fprintf(stderr, "failed to alloc post glyphNameIndex array: %s\n", strerror(errno));
+					warnerr("failed to alloc post glyphNameIndex array");
 					return 0;
 				}
 
@@ -1067,7 +1065,7 @@ int load_post_table(TTF_Font *font, TTF_Table *table) {
 
 				post->glyph_names = (char **) malloc(post->num_glyphs * sizeof(*post->glyph_names));
 				if (!post->glyph_names) {
-					fprintf(stderr, "failed to alloc post glyph names: %s\n", strerror(errno));
+					warnerr("failed to alloc post glyph names");
 					return 0;
 				}
 
@@ -1075,7 +1073,7 @@ int load_post_table(TTF_Font *font, TTF_Table *table) {
 					uint16_t index = glyph_name_index[i];
 					post->glyph_names[i] = (char *) malloc(strlen(mac_encoding[index]) * sizeof(*post->glyph_names[i]));
 					if (!post->glyph_names) {
-						fprintf(stderr, "failed to alloc glyph name %d: %s\n", index, strerror(errno));
+						warnerr("failed to alloc glyph name %d: %s", index);
 						return 0;
 					}
 					strcpy(post->glyph_names[i], mac_encoding[index]);
@@ -1099,8 +1097,7 @@ int load_table(TTF_Font *font, TTF_Table *table) {
 	}
 	// Seek to start of table
 	if (lseek(font->fd, table->offset, SEEK_SET) < 0) {
-		fprintf(stderr, "failed to seek to %.*s table: %s\n",
-				TAG_LENGTH, (char *)&(table->tag), strerror(errno));
+		warnerr("failed to seek to %.*s table: %s", TAG_LENGTH, (char *)&(table->tag));
 		return 0;
 	}
 	switch (table->tag) {
@@ -1140,7 +1137,7 @@ int load_table(TTF_Font *font, TTF_Table *table) {
 		case 0x70657270:	/* prep */
 			break;
 		default:
-			fprintf(stderr, "unknown font table type '%.*s'\n", TAG_LENGTH, (char *)&(table->tag));
+			warn("unknown font table type '%.*s'", TAG_LENGTH, (char *)&(table->tag));
 			break;
 	}
 
@@ -1164,12 +1161,12 @@ int load_tables(TTF_Font *font) {
 	for (i = 0; required_tables[i] != NULL; i++) {
 		TTF_Table *table = get_table_by_name(font, required_tables[i]);
 		if (!table) {
-			fprintf(stderr, "%s table was not found\n", required_tables[i]);
+			warn("%s table was not found", required_tables[i]);
 			return 0;
 		}
 
 		if (!load_table(font, table)) {
-			fprintf(stderr, "failed to load table '%s'\n", required_tables[i]);
+			warn("failed to load table '%s'", required_tables[i]);
 			return 0;
 		}
 		table->status = STATUS_LOADED;
@@ -1179,7 +1176,7 @@ int load_tables(TTF_Font *font) {
 		TTF_Table *table = &font->tables[i];
 		if (table->status != STATUS_LOADED) {
 			if (!load_table(font, table)) {
-				fprintf(stderr, "failed to load table '%.*s'\n", TAG_LENGTH, (char *)&(table->tag));
+				warn("failed to load table '%.*s'", TAG_LENGTH, (char *)&(table->tag));
 				continue;
 			}
 			table->status = STATUS_LOADED;
@@ -1361,6 +1358,137 @@ TTF_Table *get_table_by_name(TTF_Font *font, const char *name) {
 	return get_table(font, s_to_tag(name));
 }
 
+cmap_Table *get_cmap_table(TTF_Font *font) {
+	if (!font) {
+		return NULL;
+	}
+	TTF_Table *table = get_table(font, 0x70616d63);
+	if (table) {
+		return &table->data.cmap;
+	}
+	return NULL;
+}
+
+cvt_Table *get_cvt_table(TTF_Font *font) {
+	if (!font) {
+		return NULL;
+	}
+	TTF_Table *table = get_table(font, 0x20747663);
+	if (table) {
+		return &table->data.cvt;
+	}
+	return NULL;
+}
+
+glyf_Table *get_glyf_table(TTF_Font *font) {
+	if (!font) {
+		return NULL;
+	}
+	TTF_Table *table = get_table(font, 0x66796c67);
+	if (table) {
+		return &table->data.glyf;
+	}
+	return NULL;
+}
+
+head_Table *get_head_table(TTF_Font *font) {
+	if (!font) {
+		return NULL;
+	}
+	TTF_Table *table = get_table(font, 0x64616568);
+	if (table) {
+		return &table->data.head;
+	}
+	return NULL;
+}
+
+hhea_Table *get_hhea_table(TTF_Font *font) {
+	if (!font) {
+		return NULL;
+	}
+	TTF_Table *table = get_table(font, 0x61656868);
+	if (table) {
+		return &table->data.hhea;
+	}
+	return NULL;
+}
+
+loca_Table *get_loca_table(TTF_Font *font) {
+	if (!font) {
+		return NULL;
+	}
+	TTF_Table *table = get_table(font, 0x61636f6c);
+	if (table) {
+		return &table->data.loca;
+	}
+	return NULL;
+}
+
+maxp_Table *get_maxp_table(TTF_Font *font) {
+	if (!font) {
+		return NULL;
+	}
+	TTF_Table *table = get_table(font, 0x7078616d);
+	if (table) {
+		return &table->data.maxp;
+	}
+	return NULL;
+}
+
+post_Table *get_post_table(TTF_Font *font) {
+	if (!font) {
+		return NULL;
+	}
+	TTF_Table *table = get_table(font, 0x74736f70);
+	if (table) {
+		return &table->data.post;
+	}
+	return NULL;
+}
+
+uint32_t get_glyph_index(TTF_Font *font, int16_t c) {
+	if (!font) {
+		return -1;
+	}
+	// Get cmap subtables
+	cmap_Table *cmap = get_cmap_table(font);
+	if (!cmap) {
+		warn("failed to get cmap table");
+		return -1;
+	}
+
+	int i;
+	for (i = 0; i < cmap->num_subtables; i++) {
+		cmap_subTable *subtable = &cmap->subtables[i];
+		if (!subtable->glyph_index_array || c < 0 || c >= subtable->num_indices) {
+			continue;
+		}
+		return subtable->glyph_index_array[c];
+	}
+
+	return -1;
+}
+
+TTF_Glyph *get_glyph(TTF_Font *font, int16_t c) {
+	if (!font) {
+		return NULL;
+	}
+	// Get glyf table
+	glyf_Table *glyf = get_glyf_table(font);
+	if (!glyf) {
+		warn("failed to get glyf table");
+		return NULL;
+	}
+
+	// Lookup glyph index in cmap table
+	uint32_t glyph_index = get_glyph_index(font, c);
+	if (glyph_index < glyf->num_glyphs) {
+		return &glyf->glyphs[glyph_index];
+	}
+
+	return NULL;
+}
+
 TTF_Font *parse_file(const char *filename) {
 	if (!filename) {
 		return NULL;
@@ -1368,24 +1496,24 @@ TTF_Font *parse_file(const char *filename) {
 
 	TTF_Font *font = (TTF_Font*) malloc(sizeof(TTF_Font));
 	if (!font) {
-		fprintf(stderr, "failed to alloc font: %s\n", strerror(errno));
+		warnerr("failed to alloc font");
 		return NULL;
 	}
 
 	if ((font->fd = open(filename, O_RDONLY)) < 0) {
-		fprintf(stderr, "failed to open font file: %s\n", strerror(errno));
+		warnerr("failed to open font file");
 		return NULL;
 	}
 
 	if (!read_font_dir(font)) {
-		fprintf(stderr, "failed to read font dir\n");
+		warn("failed to read font dir");
 	}
 	if (!load_tables(font)) {
-		fprintf(stderr, "failed to load font tables\n");
+		warn("failed to load font tables");
 	}
 
 	if (close(font->fd) < 0) {
-		fprintf(stderr, "failed to close font file: %s\n", strerror(errno));
+		warnerr("failed to close font file");
 	}
 
 	return font;

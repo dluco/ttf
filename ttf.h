@@ -22,6 +22,7 @@ typedef struct _cmap_subTable {
 	uint32_t length;
 	uint32_t language;
 
+	uint16_t num_indices;
 	uint32_t *glyph_index_array;
 } cmap_subTable;
 
@@ -154,8 +155,10 @@ typedef struct _hhea_Table {
 	uint16_t num_of_long_hor_metrics;
 } hhea_Table;
 
-#define SHORT_OFFSETS	0
-#define LONG_OFFSETS	1
+enum {
+	SHORT_OFFSETS =	0,
+	LONG_OFFSETS =	1
+};
 
 typedef struct _loca_Table {
 	uint32_t *offsets;
@@ -194,6 +197,17 @@ typedef struct _post_Table {
 	char **glyph_names;
 } post_Table;
 
+/**
+ * TTF_Table possible statuses.
+ */
+enum {
+	STATUS_NONE,
+	STATUS_LOADED,
+	STATUS_FREED
+};
+
+#define TAG_LENGTH	4
+
 typedef struct _TTF_Table {
 	uint32_t tag;
 	uint32_t check_sum;
@@ -213,15 +227,6 @@ typedef struct _TTF_Table {
 	} data;
 } TTF_Table;
 
-/**
- * TTF_Table possible statuses.
- */
-enum {
-	STATUS_NONE,
-	STATUS_LOADED,
-	STATUS_FREED
-};
-
 typedef struct _TTF_Font {
 	uint32_t scaler_type;
 	uint16_t num_tables;
@@ -233,7 +238,42 @@ typedef struct _TTF_Font {
 	TTF_Table *tables;
 } TTF_Font;
 
-#define TAG_LENGTH	4
+typedef struct _TTF_Line {
+	int16_t x[2], y[2];
+} TTF_Line;
+
+typedef struct _TTF_Curve {
+	int16_t *x, *y;
+	int16_t num_points;
+} TTF_Curve;
+
+enum {
+	LINE,
+	CURVE
+};
+
+typedef struct _TTF_Segment {
+	int type;
+	union {
+		TTF_Line line;
+		TTF_Curve curve;
+	} data;
+} TTF_Segment;
+
+typedef struct _TTF_Contour {
+	TTF_Segment *segments;
+	int16_t num_segments;
+} TTF_Contour;
+
+typedef struct _TTF_Outline {
+	TTF_Contour *contours;
+	int16_t num_contours;
+} TTF_Outline;
+
+typedef struct _TTF_Bitmap {
+	int w, h;
+	uint32_t *data;
+} TTF_Bitmap;
 
 uint8_t read_byte(int fd);
 uint16_t read_hword(int fd);
@@ -261,7 +301,20 @@ void free_table(TTF_Table *table);
 void free_font(TTF_Font *font);
 
 TTF_Table *get_table(TTF_Font *font, uint32_t tag);
+
+cmap_Table *get_cmap_table(TTF_Font *font);
+cvt_Table *get_cvt_table(TTF_Font *font);
+glyf_Table *get_glyf_table(TTF_Font *font);
+head_Table *get_head_table(TTF_Font *font);
+hhea_Table *get_hhea_table(TTF_Font *font);
+loca_Table *get_loca_table(TTF_Font *font);
+maxp_Table *get_maxp_table(TTF_Font *font);
+post_Table *get_post_table(TTF_Font *font);
+
 TTF_Table *get_table_by_name(TTF_Font *font, const char *name);
+
+uint32_t get_glyph_index(TTF_Font *font, int16_t c);
+TTF_Glyph *get_glyph(TTF_Font *font, int16_t c);
 
 TTF_Font *parse_file(const char *filename);
 
@@ -271,5 +324,7 @@ void print_head_table(head_Table *head);
 void print_hhea_table(hhea_Table *hhea);
 void print_table(TTF_Table *table);
 void print_font(TTF_Font *font);
+
+#include "render.h"
 
 #endif /* TTF_H */
