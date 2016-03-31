@@ -326,5 +326,6 @@ void print_table(TTF_Table *table);
 void print_font(TTF_Font *font);
 
 #include "render.h"
+#include "utils.h"
 
 #endif /* TTF_H */
