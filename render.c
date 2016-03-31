@@ -229,7 +229,7 @@ void free_bitmap(TTF_Bitmap *bitmap) {
 	free(bitmap);
 }
 
-inline void set_rgb(png_byte *ptr, uint32_t value) {
+static inline void set_rgb(png_byte *ptr, uint32_t value) {
 	uint8_t *b = (uint8_t *)&value;
 	ptr[0] = b[2]; ptr[1] = b[1]; ptr[2] = b[0];
 }

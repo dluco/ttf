@@ -5,12 +5,16 @@ OBJS := ${SRC:.c=.o}
 DOBJS := ${SRC:.c=.do}
 DEPS := ${SRC:.c=.d}
 
+all: CFLAGS += ${RCFLAGS}
+all: LFLAGS += ${RLFLAGS}
 all: ${PROJECT}
 
+debug: CFLAGS += ${DCFLAGS}
+debug: LFLAGS += ${DLFLAGS}
 debug: ${PROJECT}-debug
 
 ${PROJECT}: ${OBJS}
-	${CC} ${LFLAGS} ${SFLAGS} $^ -o $@
+	${CC} ${LFLAGS} $^ -o $@
 
 ${PROJECT}-debug: ${DOBJS}
 	${CC} ${LFLAGS} $^ -o $@
@@ -20,8 +24,8 @@ ${PROJECT}-debug: ${DOBJS}
 
 # Compile and generate dependency info
 %.o: %.c
-	${CC} -c ${CFLAGS} ${RFLAGS} $*.c -o $*.o
-	@${CC} -MM ${CFLAGS} ${RFLAGS} $*.c > $*.d
+	${CC} -c ${CFLAGS} $*.c -o $*.o
+	@${CC} -MM ${CFLAGS} $*.c > $*.d
 	@mv -f $*.d $*.d.tmp
 	@sed -e 's|.*:|$*.o:|' < $*.d.tmp > $*.d
 	@sed -e 's/.*://' -e 's/\\$$//' < $*.d.tmp | fmt -1 | \
@@ -29,7 +33,7 @@ ${PROJECT}-debug: ${DOBJS}
 	@rm -f $*.d.tmp
 
 %.do: %.c
-	${CC} -c ${CFLAGS} ${DFLAGS} $*.c -o $*.do
+	${CC} -c ${CFLAGS} $*.c -o $*.do
 	@${CC} -MM ${CFLAGS} $*.c > $*.d
 	@mv -f $*.d $*.d.tmp
 	@sed -e 's|.*:|$*.o:|' < $*.d.tmp > $*.d

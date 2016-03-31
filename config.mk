@@ -10,10 +10,10 @@ CFLAGS := -Wall -Wextra -pedantic -std=c99
 # Link flags
 LFLAGS := -lm -lpng
 
-# Strip flags
-SFLAGS := -s
-
-RFLAGS := -O2
+# Release flags
+RCFLAGS := -O2 -flto
+RLFLAGS := -O2 -flto -s
 
 # Debug flags
-DFLAGS := -O0 -g
+DCFLAGS := -g -O0 -DDEBUG
+DLFLAGS := -O0
