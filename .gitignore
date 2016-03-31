@@ -3,3 +3,7 @@
 *.d
 ttf
 ttf-debug
+
+output.png
+
+examples/

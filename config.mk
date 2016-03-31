@@ -8,7 +8,7 @@ CC := gcc
 CFLAGS := -Wall -Wextra -pedantic -std=c99
 
 # Link flags
-LFLAGS := -lm
+LFLAGS := -lm -lpng
 
 # Strip flags
 SFLAGS := -s

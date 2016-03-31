@@ -6,11 +6,12 @@ int main(int argc, char* argv[]) {
 	char *filename = NULL;
 
 	if (argc != 2) {
-		fprintf(stderr, "Usage: %s <filename>\n", argv[0]);
-		exit(EXIT_FAILURE);
+		filename = (char *) "Vera.ttf";
+//		fprintf(stderr, "Usage: %s <filename>\n", argv[0]);
+//		exit(EXIT_FAILURE);
+	} else {
+		filename = argv[1];
 	}
-
-	filename = argv[1];
 	TTF_Font *font = parse_file(filename);
 
 	TTF_Glyph *glyph = get_glyph(font, 'A');
@@ -21,6 +22,10 @@ int main(int argc, char* argv[]) {
 
 		free_outline(outline);
 	}
+
+	TTF_Bitmap *bitmap = create_bitmap(100, 100, 0x000000);
+	save_bitmap(bitmap, "output.png", "Test");
+	free_bitmap(bitmap);
 
 //	print_font(font);
 

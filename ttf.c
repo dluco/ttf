@@ -1176,7 +1176,7 @@ int load_tables(TTF_Font *font) {
 		TTF_Table *table = &font->tables[i];
 		if (table->status != STATUS_LOADED) {
 			if (!load_table(font, table)) {
-				warn("failed to load table '%.*s'", TAG_LENGTH, (char *)&(table->tag));
+//				warn("failed to load table '%.*s'", TAG_LENGTH, (char *)&(table->tag));
 				continue;
 			}
 			table->status = STATUS_LOADED;
