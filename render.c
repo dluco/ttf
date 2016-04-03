@@ -460,36 +460,24 @@ int save_bitmap(TTF_Bitmap *bitmap, const char *filename, const char *title) {
 	png_infop info_ptr = NULL;
 	png_byte *row = NULL;
 
-	if (!bitmap) {
-		return 0;
-	}
+	RETINIT(SUCCESS);
+
+	CHECKPTR(bitmap);
 
 	// Open file for writing (binary mode)
 	fp = fopen(filename, "wb");
-	if (!fp) {
-		warnerr("failed to open file '%s' for saving bitmap");
-		return 0;
-	}
+	CHECKFAIL(fp, warnerr("failed to open file '%s' for saving bitmap", filename));
 
 	// Initialize the write structure
 	png_ptr = png_create_write_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
-	if (!png_ptr) {
-		warn("failed to alloc png write struct");
-		return 0; // FIXME
-	}
+	CHECKFAIL(png_ptr, warn("failed to alloc png write struct"));
 
 	// Initialize the info structure
 	info_ptr = png_create_info_struct(png_ptr);
-	if (!info_ptr) {
-		warn("failed to alloc png info struct");
-		return 0; // FIXME
-	}
+	CHECKFAIL(info_ptr, warn("failed to alloc png info struct"));
 
 	// Setup libpng exception handling
-	if (setjmp(png_jmpbuf(png_ptr))) {
-		warn("error occurred during png creation");
-		return 0; // FIXME
-	}
+	CHECKFAIL(setjmp(png_jmpbuf(png_ptr)) == 0, warn("error occurred during png creation"));
 
 	png_init_io(png_ptr, fp);
 
@@ -511,10 +499,7 @@ int save_bitmap(TTF_Bitmap *bitmap, const char *filename, const char *title) {
 
 	// Allocate memory for one row (RBG = 3 bytes / pixel)
 	row = (png_byte *) malloc((bitmap->w * 3) * sizeof(*row));
-	if (!row) {
-		warnerr("failed to alloc png row");
-		return 0; // FIXME
-	}
+	CHECKFAIL(row, warnerr("failed to alloc png row"));
 
 	// Write image data
 	int x, y;
@@ -528,11 +513,10 @@ int save_bitmap(TTF_Bitmap *bitmap, const char *filename, const char *title) {
 	// End write
 	png_write_end(png_ptr, NULL);
 
-	// FIXME: use goto finalize, etc.
-	fclose(fp);
-	png_free_data(png_ptr, info_ptr, PNG_FREE_ALL, -1);
-	png_destroy_write_struct(&png_ptr, (png_infopp)NULL);
-	free(row);
-
-	return 1;
+	RETURN(
+		if (fp) fclose(fp);
+		if (info_ptr) png_free_data(png_ptr, info_ptr, PNG_FREE_ALL, -1);
+		if (png_ptr) png_destroy_write_struct(&png_ptr, (png_infopp)NULL);
+		if (row) free(row);
+	);
 }
