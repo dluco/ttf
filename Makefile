@@ -27,11 +27,11 @@ $(PROG)-debug: $(DOBJS)
 # Compile and generate dependency info
 %.o: %.c
 	$(CC) -c $(CFLAGS) $*.c -o $*.o
-	@$(CC) -MM $(DEPENDFLAGS) -MT $@ $*.c -MF $*.d
+	$(CPP) -MM $(DEPFLAGS) -MT $@ $*.c -MF $*.d
 
 %.do: %.c
 	$(CC) -c $(CFLAGS) $*.c -o $*.do
-	@$(CC) -MM $(DEPENDFLAGS) -MT $@ $*.c -MF $*.d
+	$(CPP) -MM $(DEPFLAGS) -MT $@ $*.c -MF $*.d
 
 # Include dependency info for *existing* object files
 -include $(DEPS)

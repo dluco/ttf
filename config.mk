@@ -3,14 +3,17 @@ VERSION := 0.0.0
 
 MODULES := parse raster
 
-# C compilter
-CC := gcc
-
-# C preprocessor flags
-CPPFLAGS :=
+# C compiler
+CC := cc
 
 # C compiler flags
 CFLAGS := -Wall -Wextra -pedantic -std=c99
+
+# C preprocessor
+CPP := cpp
+
+# C preprocessor flags
+CPPFLAGS :=
 
 # Link flags
 LDFLAGS := -Wl,--as-needed
@@ -19,7 +22,7 @@ LDFLAGS := -Wl,--as-needed
 LDLIBS := -lm -lpng
 
 # Dependency creation flags
-DEPENDFLAGS := -MG -MP
+DEPFLAGS := -MG -MP
 
 # Release flags
 CFLAGS.release := -O2 -flto
