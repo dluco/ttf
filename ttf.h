@@ -37,6 +37,38 @@ typedef struct _cvt_Table {
 	int16_t *control_values;
 } cvt_Table;
 
+typedef struct _TTF_Line {
+	int type;
+	int16_t x[2], y[2];
+} TTF_Line;
+
+typedef struct _TTF_Curve {
+	int type;
+	int16_t *x, *y;
+	int16_t num_points;
+} TTF_Curve;
+
+enum {
+	LINE,
+	CURVE
+};
+
+typedef union _TTF_Segment {
+	int type;	// Must be first element
+	TTF_Line line;
+	TTF_Curve curve;
+} TTF_Segment;
+
+typedef struct _TTF_Contour {
+	TTF_Segment *segments;
+	int16_t num_segments;
+} TTF_Contour;
+
+typedef struct _TTF_Outline {
+	TTF_Contour *contours;
+	int16_t num_contours;
+} TTF_Outline;
+
 typedef struct _TTF_Glyph {
 	int16_t number_of_contours;
 	int16_t x_min;
@@ -53,6 +85,7 @@ typedef struct _TTF_Glyph {
 
 	int16_t num_points;
 
+	TTF_Outline *outline;
 	// TODO: Compound glyphs
 } TTF_Glyph;
 
@@ -237,38 +270,6 @@ typedef struct _TTF_Font {
 	int fd;
 	TTF_Table *tables;
 } TTF_Font;
-
-typedef struct _TTF_Line {
-	int16_t x[2], y[2];
-} TTF_Line;
-
-typedef struct _TTF_Curve {
-	int16_t *x, *y;
-	int16_t num_points;
-} TTF_Curve;
-
-enum {
-	LINE,
-	CURVE
-};
-
-typedef struct _TTF_Segment {
-	int type;
-	union {
-		TTF_Line line;
-		TTF_Curve curve;
-	} data;
-} TTF_Segment;
-
-typedef struct _TTF_Contour {
-	TTF_Segment *segments;
-	int16_t num_segments;
-} TTF_Contour;
-
-typedef struct _TTF_Outline {
-	TTF_Contour *contours;
-	int16_t num_contours;
-} TTF_Outline;
 
 typedef struct _TTF_Bitmap {
 	int w, h;

@@ -18,11 +18,11 @@ void free_segment(TTF_Segment *segment) {
 		case LINE:
 			break;
 		case CURVE:
-			if (segment->data.curve.x) {
-				free(segment->data.curve.x);
+			if (segment->curve.x) {
+				free(segment->curve.x);
 			}
-			if (segment->data.curve.y) {
-				free(segment->data.curve.y);
+			if (segment->curve.y) {
+				free(segment->curve.y);
 			}
 			break;
 	}
@@ -113,7 +113,7 @@ TTF_Outline *glyph_to_outline(TTF_Glyph *glyph) {
 				// Segment is a line
 				segment->type = LINE;
 
-				TTF_Line *line = &segment->data.line;
+				TTF_Line *line = &segment->line;
 
 				line->x[0] = glyph->x_coordinates[seg_start];
 				line->y[0] = glyph->y_coordinates[seg_start];
@@ -126,7 +126,7 @@ TTF_Outline *glyph_to_outline(TTF_Glyph *glyph) {
 				// Segment is a curve
 				segment->type = CURVE;
 
-				TTF_Curve *curve = &segment->data.curve;
+				TTF_Curve *curve = &segment->curve;
 
 				// Include first point (seg_start)
 				curve->num_points = 1;
@@ -164,7 +164,7 @@ TTF_Outline *glyph_to_outline(TTF_Glyph *glyph) {
 				}
 
 				// Next segment starts at endpoint of current segment (curve)
-				seg_start += segment->data.curve.num_points - 1;
+				seg_start += segment->curve.num_points - 1;
 			}
 		}
 	}
@@ -198,7 +198,7 @@ TTF_Bitmap *render_glyph(TTF_Glyph *glyph) {
 			switch (segment->type) {
 				case LINE:
 					{
-						TTF_Line *line = &segment->data.line;
+						TTF_Line *line = &segment->line;
 						int k;
 						for (k = 0; k < 2; k++) {
 							line->x[k] = (line->x[k] - glyph->x_min);
@@ -208,7 +208,7 @@ TTF_Bitmap *render_glyph(TTF_Glyph *glyph) {
 					break;
 				case CURVE:
 					{
-						TTF_Curve *curve = &segment->data.curve;
+						TTF_Curve *curve = &segment->curve;
 						int k;
 						for (k = 0; k < curve->num_points; k++) {
 							curve->x[k] = (curve->x[k] - glyph->x_min);
@@ -253,10 +253,10 @@ int render_outline(TTF_Bitmap *bitmap, TTF_Outline *outline, uint32_t c) {
 			TTF_Segment *segment = &contour->segments[j];
 			switch (segment->type) {
 				case LINE:
-					render_line(bitmap, &segment->data.line, c);
+					render_line(bitmap, &segment->line, c);
 					break;
 				case CURVE:
-					render_curve(bitmap, &segment->data.curve, c);
+					render_curve(bitmap, &segment->curve, c);
 					break;
 				default:
 					// Do nothing
