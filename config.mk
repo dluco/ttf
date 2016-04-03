@@ -1,6 +1,8 @@
 PROJECT := ttf
 VERSION := 0.0.0
 
+MODULES := parse raster
+
 # C compilter
 CC := gcc
 

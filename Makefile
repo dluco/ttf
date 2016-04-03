@@ -1,31 +1,34 @@
 include config.mk
 
-SRC := $(wildcard *.c)
-OBJS := ${SRC:.c=.o}
-DOBJS := ${SRC:.c=.do}
-DEPS := ${SRC:.c=.d}
+SRC := $(wildcard *.c) $(wildcard $(patsubst %, %/*.c, $(MODULES)))
 
-all: CFLAGS += ${RCFLAGS}
-all: LFLAGS += ${RLFLAGS}
-all: ${PROJECT}
+OBJS := $(SRC:.c=.o)
+DOBJS := $(SRC:.c=.do)
+DEPS := $(SRC:.c=.d)
 
-debug: CFLAGS += ${DCFLAGS}
-debug: LFLAGS += ${DLFLAGS}
-debug: ${PROJECT}-debug
+all: release
 
-${PROJECT}: ${OBJS}
-	${CC} ${LFLAGS} $^ -o $@
+release: CFLAGS += $(RCFLAGS)
+release: LFLAGS += $(RLFLAGS)
+release: $(PROJECT)
 
-${PROJECT}-debug: ${DOBJS}
-	${CC} ${LFLAGS} $^ -o $@
+debug: CFLAGS += $(DCFLAGS)
+debug: LFLAGS += $(DLFLAGS)
+debug: default $(PROJECT)-debug
+
+$(PROJECT): $(OBJS)
+	$(CC) $(LFLAGS) $^ -o $@
+
+$(PROJECT)-debug: $(DOBJS)
+	$(CC) $(LFLAGS) $^ -o $@
 
 # Include dependency info for *existing* .o files
--include ${DEPS}
+-include $(DEPS)
 
 # Compile and generate dependency info
 %.o: %.c
-	${CC} -c ${CFLAGS} $*.c -o $*.o
-	@${CC} -MM ${CFLAGS} $*.c > $*.d
+	$(CC) -c $(CFLAGS) $*.c -o $*.o
+	@$(CC) -MM $(CFLAGS) $*.c > $*.d
 	@mv -f $*.d $*.d.tmp
 	@sed -e 's|.*:|$*.o:|' < $*.d.tmp > $*.d
 	@sed -e 's/.*://' -e 's/\\$$//' < $*.d.tmp | fmt -1 | \
@@ -33,8 +36,8 @@ ${PROJECT}-debug: ${DOBJS}
 	@rm -f $*.d.tmp
 
 %.do: %.c
-	${CC} -c ${CFLAGS} $*.c -o $*.do
-	@${CC} -MM ${CFLAGS} $*.c > $*.d
+	$(CC) -c $(CFLAGS) $*.c -o $*.do
+	@$(CC) -MM $(CFLAGS) $*.c > $*.d
 	@mv -f $*.d $*.d.tmp
 	@sed -e 's|.*:|$*.o:|' < $*.d.tmp > $*.d
 	@sed -e 's/.*://' -e 's/\\$$//' < $*.d.tmp | fmt -1 | \
@@ -42,9 +45,9 @@ ${PROJECT}-debug: ${DOBJS}
 	@rm -f $*.d.tmp
 
 clean:
-	rm -rf ${PROJECT} ${PROJECT}-debug ${OBJS} ${DOBJS} ${DEPS}
+	$(RM) -rf $(PROJECT) $(PROJECT)-debug $(OBJS) $(DOBJS) $(DEPS)
 
 tags:
 	ctags -R -f .tags .
 
-.PHONY: all clean tags
+.PHONY: all release debug clean tags
