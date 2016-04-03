@@ -1,3 +1,5 @@
+.DEFAULT_GOAL := all
+
 include config.mk
 
 SRC := $(wildcard *.c) $(wildcard $(patsubst %, %/*.c, $(MODULES)))
@@ -8,44 +10,34 @@ DEPS := $(SRC:.c=.d)
 
 all: release
 
-release: CFLAGS += $(RCFLAGS)
-release: LFLAGS += $(RLFLAGS)
-release: $(PROJECT)
+release: CFLAGS += $(CFLAGS.release)
+release: LDFLAGS += $(LDFLAGS.release)
+release: $(PROG)
 
-debug: CFLAGS += $(DCFLAGS)
-debug: LFLAGS += $(DLFLAGS)
-debug: default $(PROJECT)-debug
+debug: CFLAGS += $(CFLAGS.debug)
+debug: LDFLAGS += $(LDFLAGS.debug)
+debug: $(PROG)-debug
 
-$(PROJECT): $(OBJS)
-	$(CC) $(LFLAGS) $^ -o $@
+$(PROG): $(OBJS)
+	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
 
-$(PROJECT)-debug: $(DOBJS)
-	$(CC) $(LFLAGS) $^ -o $@
-
-# Include dependency info for *existing* .o files
--include $(DEPS)
+$(PROG)-debug: $(DOBJS)
+	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
 
 # Compile and generate dependency info
 %.o: %.c
 	$(CC) -c $(CFLAGS) $*.c -o $*.o
-	@$(CC) -MM $(CFLAGS) $*.c > $*.d
-	@mv -f $*.d $*.d.tmp
-	@sed -e 's|.*:|$*.o:|' < $*.d.tmp > $*.d
-	@sed -e 's/.*://' -e 's/\\$$//' < $*.d.tmp | fmt -1 | \
-		sed -e 's/^ *//' -e 's/$$/:/' >> $*.d
-	@rm -f $*.d.tmp
+	@$(CC) -MM $(DEPENDFLAGS) -MT $@ $*.c -MF $*.d
 
 %.do: %.c
 	$(CC) -c $(CFLAGS) $*.c -o $*.do
-	@$(CC) -MM $(CFLAGS) $*.c > $*.d
-	@mv -f $*.d $*.d.tmp
-	@sed -e 's|.*:|$*.o:|' < $*.d.tmp > $*.d
-	@sed -e 's/.*://' -e 's/\\$$//' < $*.d.tmp | fmt -1 | \
-		sed -e 's/^ *//' -e 's/$$/:/' >> $*.d
-	@rm -f $*.d.tmp
+	@$(CC) -MM $(DEPENDFLAGS) -MT $@ $*.c -MF $*.d
+
+# Include dependency info for *existing* object files
+-include $(DEPS)
 
 clean:
-	$(RM) -rf $(PROJECT) $(PROJECT)-debug $(OBJS) $(DOBJS) $(DEPS)
+	$(RM) -rf $(PROG) $(PROG)-debug $(OBJS) $(DOBJS) $(DEPS)
 
 tags:
 	ctags -R -f .tags .

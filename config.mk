@@ -1,4 +1,4 @@
-PROJECT := ttf
+PROG := ttf
 VERSION := 0.0.0
 
 MODULES := parse raster
@@ -6,16 +6,25 @@ MODULES := parse raster
 # C compilter
 CC := gcc
 
-# C flags
+# C preprocessor flags
+CPPFLAGS :=
+
+# C compiler flags
 CFLAGS := -Wall -Wextra -pedantic -std=c99
 
 # Link flags
-LFLAGS := -lm -lpng
+LDFLAGS := -Wl,--as-needed
+
+# Libraries
+LDLIBS := -lm -lpng
+
+# Dependency creation flags
+DEPENDFLAGS := -MG -MP
 
 # Release flags
-RCFLAGS := -O2 -flto
-RLFLAGS := -O2 -flto -s
+CFLAGS.release := -O2 -flto
+LDFLAGS.release := -O2 -flto -s
 
 # Debug flags
-DCFLAGS := -g -O0 -DDEBUG
-DLFLAGS := -O0
+CFLAGS.debug := -g -O0 -DDEBUG
+LDFLAGS.debug := -O0
