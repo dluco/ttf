@@ -6,7 +6,7 @@ int main(int argc, char* argv[]) {
 	char *filename = NULL;
 	if (argc != 2) {
 		// Default
-		filename = (char *) "Vera.ttf";
+		filename = (char *) "data/Vera.ttf";
 	} else {
 		filename = argv[1];
 	}
@@ -19,7 +19,7 @@ int main(int argc, char* argv[]) {
 	} else {
 		TTF_Bitmap *bitmap = render_glyph(glyph);
 		if (bitmap) {
-			save_bitmap(bitmap, "output.png", "Test");
+			save_bitmap(bitmap, "data/output.png", NULL);
 			free_bitmap(bitmap);
 		}
 	}
