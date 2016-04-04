@@ -2,7 +2,7 @@
 
 include config.mk
 
-SRC := $(wildcard *.c) $(wildcard $(patsubst %, %/*.c, $(MODULES)))
+SRC := $(wildcard *.c) $(wildcard $(patsubst %,%/*.c, $(MODULES)))
 
 OBJS := $(SRC:.c=.o)
 DOBJS := $(SRC:.c=.do)

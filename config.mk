@@ -1,13 +1,13 @@
 PROG := ttf
 VERSION := 0.0.0
 
-MODULES := parse raster
+MODULES := base parse raster
 
 # C compiler
 CC := cc
 
 # C compiler flags
-CFLAGS := -Wall -Wextra -pedantic -std=c99
+CFLAGS := -Wall -Wextra -Werror -pedantic -std=c99 -I.
 
 # C preprocessor
 CPP := cpp

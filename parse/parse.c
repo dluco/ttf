@@ -1,14 +1,10 @@
-#include "ttf.h"
-#include "utils.h"
+#include "parse.h"
 #include <fcntl.h>
 #include <unistd.h>
-#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
-#include <time.h>
-#include <limits.h>
 
 const char *mac_encoding[258] = {
 	[0] =	".notdef",

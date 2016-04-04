@@ -1,8 +1,7 @@
-#ifndef RENDER_H
-#define RENDER_H
+#ifndef RASTER_H
+#define RASTER_H
 
-#include "ttf.h"
-#include <stdint.h>
+#include "../ttf.h"
 
 void free_segment(TTF_Segment *segment);
 void free_contour(TTF_Contour *contour);
@@ -23,4 +22,4 @@ uint32_t bitmap_get(TTF_Bitmap *bitmap, int x, int y);
 
 int save_bitmap(TTF_Bitmap *bitmap, const char *filename, const char *title);
 
-#endif /* RENDER_H */
+#endif /* RASTER_H */

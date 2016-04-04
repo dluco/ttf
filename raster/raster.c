@@ -1,7 +1,4 @@
-#include "ttf.h"
-#include "render.h"
-#include "utils.h"
-#include <stdint.h>
+#include "raster.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
