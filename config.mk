@@ -1,7 +1,7 @@
 PROG := ttf
 VERSION := 0.0.0
 
-MODULES := base parse raster
+MODULES := base parse raster utils
 
 # C compiler
 CC := cc

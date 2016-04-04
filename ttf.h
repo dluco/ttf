@@ -7,6 +7,6 @@
 #include "parse/parse.h"
 #include "raster/raster.h"
 
-#include "utils.h"
+#include "utils/utils.h"
 
 #endif /* TTF_H */
