@@ -1028,7 +1028,7 @@ int load_post_table(TTF_Font *font, TTF_Table *table) {
 					uint16_t index = glyph_name_index[i];
 					if (index < 258) {
 						// Glyph name is mac_encoding[index]
-						post->glyph_names[i] = (char *) malloc(strlen(mac_encoding[index]) * sizeof(*post->glyph_names[i]));
+						post->glyph_names[i] = (char *) malloc((strlen(mac_encoding[index]) + 1) * sizeof(*post->glyph_names[i]));
 						if (!post->glyph_names[i]) {
 							warnerr("failed to alloc glyph name %hu: %s", index);
 							return 0;

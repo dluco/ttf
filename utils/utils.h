@@ -3,6 +3,8 @@
 
 #include "../base/consts.h"
 
+#define PASS ;
+
 #define RETINIT(VAL) \
 	int _result = VAL
 
@@ -16,16 +18,17 @@
 	_result = (VAL) ? SUCCESS : FAILURE;	\
 	if (_result != SUCCESS) {				\
 		FAIL;								\
-		goto _release;						\
+		goto _failure;						\
 	}										\
 }
 
-#define RETURN(RELEASE) {	\
-	return SUCCESS;			\
-							\
-	_release:				\
-		RELEASE;			\
-	return _result;			\
+#define RETURN(FAIL, RELEASE) {	\
+	goto _release;				\
+	_failure:					\
+		FAIL;					\
+	_release:					\
+		RELEASE;				\
+	return _result;				\
 }
 
 void warn(const char *fmt, ...);

@@ -1,13 +1,7 @@
 #ifndef RASTER_H
 #define RASTER_H
 
-#include "../ttf.h"
-
-void free_segment(TTF_Segment *segment);
-void free_contour(TTF_Contour *contour);
-void free_outline(TTF_Outline *outline);
-
-TTF_Outline *glyph_to_outline(TTF_Glyph *glyph);
+#include "../base/types.h"
 
 TTF_Bitmap *render_glyph(TTF_Glyph *glyph);
 int render_outline(TTF_Bitmap *bitmap, TTF_Outline *outline, uint32_t c);

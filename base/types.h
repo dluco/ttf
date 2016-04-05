@@ -39,7 +39,7 @@ typedef struct _TTF_Curve {
 } TTF_Curve;
 
 typedef union _TTF_Segment {
-	int type;	// Must be first element
+	int type;	/* Must be first element */
 	TTF_Line line;
 	TTF_Curve curve;
 } TTF_Segment;
@@ -52,6 +52,7 @@ typedef struct _TTF_Contour {
 typedef struct _TTF_Outline {
 	TTF_Contour *contours;
 	int16_t num_contours;
+	int16_t point;	/* Size outline is scaled to. < 0 if unscaled. */
 } TTF_Outline;
 
 typedef struct _TTF_Glyph {
@@ -76,7 +77,7 @@ typedef struct _TTF_Glyph {
 typedef struct _glyf_Table {
 	TTF_Glyph *glyphs;
 
-	uint16_t num_glyphs; // Copied from maxp table
+	uint16_t num_glyphs; /* Copied from maxp table. */
 } glyf_Table;
 
 typedef struct _head_Table {
