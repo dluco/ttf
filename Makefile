@@ -37,9 +37,9 @@ $(PROG)-debug: $(DOBJS)
 -include $(DEPS)
 
 clean:
-	$(RM) -rf $(PROG) $(PROG)-debug $(OBJS) $(DOBJS) $(DEPS)
+	$(RM) -rf $(PROG) $(PROG)-debug $(OBJS) $(DOBJS) $(DEPS) $(TAGFILE)
 
 tags:
-	ctags -R -f .tags .
+	ctags -R -f $(TAGFILE) .
 
 .PHONY: all release debug clean tags

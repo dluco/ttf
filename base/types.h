@@ -176,14 +176,20 @@ typedef struct _TTF_Table {
 } TTF_Table;
 
 typedef struct _TTF_Font {
+	int fd;
+
 	uint32_t scaler_type;
 	uint16_t num_tables;
 	uint16_t search_range;
 	uint16_t entry_selector;
 	uint16_t range_shift;
 
-	int fd;
 	TTF_Table *tables;
+
+	uint16_t point;
+	uint16_t dpi;
+	uint16_t ppem;
+	uint16_t upem;
 } TTF_Font;
 
 typedef struct _TTF_Bitmap {

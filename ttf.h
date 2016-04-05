@@ -5,6 +5,11 @@
 #include "base/consts.h"
 
 #include "parse/parse.h"
+
+#include "tables/tables.h"
+
+#include "glyph/glyph.h"
+
 #include "raster/raster.h"
 
 #include "utils/utils.h"

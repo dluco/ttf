@@ -1,7 +1,9 @@
 PROG := ttf
 VERSION := 0.0.0
 
-MODULES := base parse raster utils
+MODULES := base tables glyph parse raster utils
+
+TAGFILE := .tags
 
 # C compiler
 CC := cc

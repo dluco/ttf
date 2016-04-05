@@ -1,6 +1,9 @@
 #ifndef CONSTS_H
 #define CONSTS_H
 
+#define SUCCESS	1
+#define FAILURE 0
+
 typedef enum _Segment_Type {
 	LINE,
 	CURVE

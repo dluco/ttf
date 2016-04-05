@@ -1,17 +1,15 @@
 #ifndef UTILS_H
 #define UTILS_H
 
-#define SUCCESS	1
-#define FAILURE 0
+#include "../base/consts.h"
 
 #define RETINIT(VAL) \
 	int _result = VAL
 
-#define CHECKPTR(PTR) {		\
-	if (!PTR) {				\
-		_result = FAILURE;	\
-		goto _release;		\
-	}						\
+#define CHECKPTR(PTR) {	\
+	if (!PTR) {			\
+		return FAILURE;	\
+	}					\
 }
 
 #define CHECKFAIL(VAL, FAIL) {				\

@@ -63,7 +63,7 @@ int save_bitmap(TTF_Bitmap *bitmap, const char *filename, const char *title) {
 
 	RETINIT(SUCCESS);
 
-	CHECKPTR(bitmap);
+	CHECKFAIL(bitmap, warn("failed to save uninitialized bitmap"));
 
 	// Open file for writing (binary mode)
 	fp = fopen(filename, "wb");
