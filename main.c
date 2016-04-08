@@ -1,4 +1,5 @@
 #include "ttf.h"
+#include "raster/config.h"
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -11,12 +12,16 @@ int main(int argc, char* argv[]) {
 		filename = argv[1];
 	}
 
-	TTF_Font *font = parse_file(filename);
+	TTF_Font *font = load_font(filename);
 
 	TTF_Glyph *glyph = get_glyph(font, 'G');
 	if (!glyph) {
 		printf("failed to get glyph\n");
 	} else {
+		raster_init(font, 12, DPI);
+
+		scale_glyph(font, glyph);
+
 		TTF_Bitmap *bitmap = render_glyph(glyph);
 		if (bitmap) {
 			save_bitmap(bitmap, "data/output.png", NULL);

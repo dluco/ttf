@@ -2,6 +2,7 @@
 #define TYPES_H
 
 #include <stdint.h>
+#include <stddef.h>
 
 typedef struct _cmap_subTable {
 	uint16_t platform_id;
@@ -187,7 +188,7 @@ typedef struct _TTF_Font {
 
 	TTF_Table *tables;
 
-	uint16_t point;
+	int16_t point;
 	uint16_t dpi;
 	uint16_t ppem;
 	uint16_t upem;

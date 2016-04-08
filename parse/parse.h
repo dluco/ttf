@@ -25,9 +25,7 @@ int read_font_dir(TTF_Font *font);
 int read_table_raw(TTF_Font *font, TTF_Table *table, uint32_t *buf);
 int load_tables(TTF_Font *font);
 
-void free_font(TTF_Font *font);
-
-TTF_Font *parse_file(const char *filename);
+int parse_file(TTF_Font *font, const char *filename);
 
 void print_cmap_table(cmap_Table *cmap);
 void print_head_table(head_Table *head);

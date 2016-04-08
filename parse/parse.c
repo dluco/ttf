@@ -1184,36 +1184,18 @@ int load_tables(TTF_Font *font) {
 	return 1;
 }
 
-void free_font(TTF_Font *font) {
-	if (!font) {
-		return;
-	}
-	if (font->tables) {
-		int i;
-		for (i = 0; i < font->num_tables; i++) {
-			TTF_Table *table = &font->tables[i];
-			free_table(table);
-			table->status = STATUS_FREED;
-		}
-		free(font->tables);
-	}
-	free(font);
-}
-
-TTF_Font *parse_file(const char *filename) {
-	if (!filename) {
-		return NULL;
+int parse_file(TTF_Font *font, const char *filename) {
+	CHECKPTR(font);
+	
+	if (!filename || strlen(filename) < 1) {
+		warn("invalid font filename");
+		return FAILURE;
 	}
 
-	TTF_Font *font = (TTF_Font*) malloc(sizeof(TTF_Font));
-	if (!font) {
-		warnerr("failed to alloc font");
-		return NULL;
-	}
-
+	/* open font file */
 	if ((font->fd = open(filename, O_RDONLY)) < 0) {
 		warnerr("failed to open font file");
-		return NULL;
+		return FAILURE;
 	}
 
 	if (!read_font_dir(font)) {
@@ -1223,11 +1205,13 @@ TTF_Font *parse_file(const char *filename) {
 		warn("failed to load font tables");
 	}
 
+	/* close font file and reset font fd */
 	if (close(font->fd) < 0) {
 		warnerr("failed to close font file");
 	}
+	font->fd = -1;
 
-	return font;
+	return SUCCESS;
 }
 
 void print_cmap_table(cmap_Table *cmap) {

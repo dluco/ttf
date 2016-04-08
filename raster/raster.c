@@ -1,10 +1,10 @@
 #include "raster.h"
+#include "bitmap.h"
 #include "../glyph/outline.h"
 #include "../tables/tables.h"
+#include "../utils/utils.h"
 #include <stdlib.h>
-#include <stdio.h>
 #include <math.h>
-#include <png.h>
 
 int raster_init(TTF_Font *font, uint16_t point, uint16_t dpi) {
 	CHECKPTR(font);
@@ -15,7 +15,7 @@ int raster_init(TTF_Font *font, uint16_t point, uint16_t dpi) {
 	head_Table *head = get_head_table(font);
 	CHECKPTR(head);
 	// Copy units per em from head table
-	head->units_per_em = font->upem;
+	font->upem = head->units_per_em;
 
 	// Calculate pixel per em (ppem)
 	font->ppem = (font->point * font->dpi) / 72;
@@ -33,7 +33,9 @@ TTF_Bitmap *render_glyph(TTF_Glyph *glyph) {
 	}
 
 	// Get glyph's outline representation
-	load_glyph_outline(glyph);
+	if (!glyph->outline) {
+		load_glyph_outline(glyph);
+	}
 	outline = glyph->outline;
 	if (!outline) {
 		warn("failed to create glyph outline");

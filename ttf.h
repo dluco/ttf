@@ -3,6 +3,7 @@
 
 #include "base/types.h"
 #include "base/consts.h"
+#include "base/font.h"
 
 #include "parse/parse.h"
 
@@ -11,6 +12,8 @@
 #include "glyph/glyph.h"
 
 #include "raster/raster.h"
+#include "raster/scale.h"
+#include "raster/bitmap.h"
 
 #include "utils/utils.h"
 
