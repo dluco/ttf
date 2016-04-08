@@ -2,6 +2,9 @@
 #include "config.h"
 #include "../glyph/outline.h"
 #include "../utils/utils.h"
+#include <math.h>
+
+#include <stdio.h>
 
 static int scale_outline(TTF_Font *font, TTF_Outline *outline) {
 	CHECKPTR(outline);
@@ -21,8 +24,8 @@ static int scale_outline(TTF_Font *font, TTF_Outline *outline) {
 						CHECKPTR(line);
 						int k;
 						for (k = 0; k < 2; k++) {
-							funit_to_pixel(font, line->x[k]);
-							funit_to_pixel(font, line->y[k]);
+							line->x[k] = funit_to_pixel(font, line->x[k]);
+							line->y[k] = funit_to_pixel(font, line->y[k]);
 						}
 					}
 					break;
@@ -32,8 +35,8 @@ static int scale_outline(TTF_Font *font, TTF_Outline *outline) {
 						CHECKPTR(curve);
 						int k;
 						for (k = 0; k < curve->num_points; k++) {
-							funit_to_pixel(font, curve->x[k]);
-							funit_to_pixel(font, curve->y[k]);
+							curve->x[k] = funit_to_pixel(font, curve->x[k]);
+							curve->y[k] = funit_to_pixel(font, curve->y[k]);
 						}
 					}
 					break;
@@ -42,6 +45,17 @@ static int scale_outline(TTF_Font *font, TTF_Outline *outline) {
 			}
 		}
 	}
+
+	printf("unscaled outline bounding box: (%f, %f, %f, %f)\n",
+			outline->x_min, outline->y_min, outline->x_max, outline->y_max);
+
+	outline->x_min = funit_to_pixel(font, outline->x_min);
+	outline->y_min = funit_to_pixel(font, outline->y_min);
+	outline->x_max = funit_to_pixel(font, outline->x_max);
+	outline->y_max = funit_to_pixel(font, outline->y_max);
+
+	printf("scaled outline bounding box: (%f, %f, %f, %f)\n",
+			outline->x_min, outline->y_min, outline->x_max, outline->y_max);
 
 	outline->point = font->point;
 
@@ -68,10 +82,18 @@ int scale_glyph(TTF_Font *font, TTF_Glyph *glyph) {
 	return SUCCESS;
 }
 
-int16_t funit_to_pixel(TTF_Font *font, int16_t funit) {
-	return funit * (font->ppem / font->upem);
+float funit_to_pixel(TTF_Font *font, int16_t funit) {
+	return round_pixel(((float)(funit * font->ppem)) / font->upem);
 }
 
-int16_t pixel_to_funit(TTF_Font *font, int16_t pixel) {
-	return pixel * (font->upem / font->ppem);
+int16_t pixel_to_funit(TTF_Font *font, float pixel) {
+	return (pixel * font->upem) / font->ppem;
+}
+
+/**
+ * Round a pixel coordinate to the nearest
+ * sixty-fourth of a pixel.
+ */
+float round_pixel(float pixel) {
+	return roundf(pixel * 64) / 64;
 }

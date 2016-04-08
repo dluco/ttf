@@ -69,6 +69,11 @@ int load_glyph_outline(TTF_Glyph *glyph) {
 	outline->contours = (TTF_Contour *) malloc(outline->num_contours * sizeof(*outline->contours));
 	CHECKFAIL(outline->contours, warnerr("failed to alloc outline contours"));
 
+	outline->x_min = glyph->x_min;
+	outline->y_min = glyph->y_min;
+	outline->x_max = glyph->x_max;
+	outline->y_max = glyph->y_max;
+
 	int i;
 	for (i = 0; i < glyph->number_of_contours; i++) {
 		TTF_Contour *contour = &outline->contours[i];
@@ -134,10 +139,10 @@ int load_glyph_outline(TTF_Glyph *glyph) {
 					curve->num_points++;
 				}
 
-				curve->x = (int16_t *) malloc(curve->num_points * sizeof(*curve->x));
+				curve->x = malloc(curve->num_points * sizeof(*curve->x));
 				CHECKFAIL(curve->x, warn("failed to alloc curve x-coordinates"));
 
-				curve->y = (int16_t *) malloc(curve->num_points * sizeof(*curve->y));
+				curve->y = malloc(curve->num_points * sizeof(*curve->y));
 				CHECKFAIL(curve->y, warn("failed to alloc curve y-coordinates"));
 
 				for (j = 0; j < curve->num_points; j++) {

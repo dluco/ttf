@@ -30,12 +30,12 @@ typedef struct _cvt_Table {
 
 typedef struct _TTF_Line {
 	int type;
-	int16_t x[2], y[2];
+	float x[2], y[2];
 } TTF_Line;
 
 typedef struct _TTF_Curve {
 	int type;
-	int16_t *x, *y;
+	float *x, *y;
 	int16_t num_points;
 } TTF_Curve;
 
@@ -53,6 +53,11 @@ typedef struct _TTF_Contour {
 typedef struct _TTF_Outline {
 	TTF_Contour *contours;
 	int16_t num_contours;
+	float x_min;	/* Scaled outline bounds */
+	float y_min;
+	float x_max;
+	float y_max;
+
 	int16_t point;	/* Size outline is scaled to. < 0 if unscaled. */
 } TTF_Outline;
 

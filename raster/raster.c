@@ -55,8 +55,8 @@ TTF_Bitmap *render_glyph(TTF_Glyph *glyph) {
 						TTF_Line *line = &segment->line;
 						int k;
 						for (k = 0; k < 2; k++) {
-							line->x[k] = (line->x[k] - glyph->x_min);
-							line->y[k] = (glyph->y_max - glyph->y_min) - (line->y[k] - glyph->y_min);
+							line->x[k] = (line->x[k] - outline->x_min);
+							line->y[k] = (outline->y_max - outline->y_min) - (line->y[k] - outline->y_min);
 						}
 					}
 					break;
@@ -65,8 +65,8 @@ TTF_Bitmap *render_glyph(TTF_Glyph *glyph) {
 						TTF_Curve *curve = &segment->curve;
 						int k;
 						for (k = 0; k < curve->num_points; k++) {
-							curve->x[k] = (curve->x[k] - glyph->x_min);
-							curve->y[k] = (glyph->y_max - glyph->y_min) - (curve->y[k] - glyph->y_min);
+							curve->x[k] = (curve->x[k] - outline->x_min);
+							curve->y[k] = (outline->y_max - outline->y_min) - (curve->y[k] - outline->y_min);
 						}
 					}
 					break;
@@ -78,8 +78,8 @@ TTF_Bitmap *render_glyph(TTF_Glyph *glyph) {
 	}
 
 	// Calculate required size for bitmap
-	w = glyph->x_max - glyph->x_min + 1;
-	h = glyph->y_max - glyph->y_min + 1;
+	w = outline->x_max - outline->x_min + 1;
+	h = outline->y_max - outline->y_min + 1;
 
 	// Create bitmap and render outline
 	bitmap = create_bitmap(w, h, 0x000000);
@@ -199,7 +199,7 @@ int render_line(TTF_Bitmap *bitmap, TTF_Line *line, uint32_t c) {
 }
 
 // Number of control points is n+1
-static inline int bezier(float mu, int16_t *p, int n) {
+static inline int bezier(float mu, float *p, int n) {
 	int k, kn, nn, nkn;
 	float blend, muk, munk;
 	int b = 0;
