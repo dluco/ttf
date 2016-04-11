@@ -14,19 +14,24 @@ int main(int argc, char* argv[]) {
 
 	TTF_Font *font = load_font(filename);
 
-	TTF_Glyph *glyph = get_glyph(font, 'G');
+	TTF_Glyph *glyph = get_glyph(font, 'A');
 	if (!glyph) {
 		printf("failed to get glyph\n");
 	} else {
 		raster_init(font, 12, DPI);
 
 		scale_glyph(font, glyph);
+		scan_glyph(font, glyph);
 
-		TTF_Bitmap *bitmap = render_glyph(glyph);
-		if (bitmap) {
-			save_bitmap(bitmap, "data/output.png", NULL);
-			free_bitmap(bitmap);
+		if (glyph->bitmap) {
+			save_bitmap(glyph->bitmap, "data/output.png", NULL);
 		}
+
+//		TTF_Bitmap *bitmap = render_glyph(glyph);
+//		if (bitmap) {
+//			save_bitmap(bitmap, "data/output.png", NULL);
+//			free_bitmap(bitmap);
+//		}
 	}
 
 	free_font(font);

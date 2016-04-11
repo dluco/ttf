@@ -1,6 +1,7 @@
 #include "glyph.h"
 #include "outline.h"
 #include "../tables/tables.h"
+#include "../raster/bitmap.h"
 #include "../utils/utils.h"
 #include <stdlib.h>
 
@@ -68,5 +69,8 @@ void free_glyph(TTF_Glyph *glyph) {
 	}
 	if (glyph->outline) {
 		free_outline(glyph->outline);
+	}
+	if (glyph->bitmap) {
+		free_bitmap(glyph->bitmap);
 	}
 }

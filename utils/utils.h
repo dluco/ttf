@@ -22,14 +22,28 @@
 	}										\
 }
 
-#define RETURN(FAIL, RELEASE) {	\
-	goto _release;				\
-	_failure:					\
-		FAIL;					\
-	_release:					\
-		RELEASE;				\
-	return _result;				\
+#define RETFAILRELEASE(FAIL, RELEASE) {	\
+	goto _release;						\
+_failure:								\
+	FAIL;								\
+_release:								\
+	RELEASE;							\
+	return _result;						\
 }
+
+#define RET \
+	RETFAILRELEASE(PASS, PASS)
+
+#define RETFAIL(FAIL) \
+	RETFAILRELEASE(FAIL, PASS)
+
+#define RETRELEASE(RELEASE) \
+	RETFAILRELEASE(PASS, RELEASE)
+
+#define IN(x, a, b) ((x) >= (a) && (x) <= (b))
+
+int mod(int a, int b);
+float symroundf(float f);
 
 void warn(const char *fmt, ...);
 void warnerr(const char *fmt, ...);

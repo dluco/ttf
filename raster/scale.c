@@ -17,31 +17,10 @@ static int scale_outline(TTF_Font *font, TTF_Outline *outline) {
 		for (j = 0; j < contour->num_segments; j++) {
 			TTF_Segment *segment = &contour->segments[j];
 			CHECKPTR(segment);
-			switch (segment->type) {
-				case LINE:
-					{
-						TTF_Line *line = &segment->line;
-						CHECKPTR(line);
-						int k;
-						for (k = 0; k < 2; k++) {
-							line->x[k] = funit_to_pixel(font, line->x[k]);
-							line->y[k] = funit_to_pixel(font, line->y[k]);
-						}
-					}
-					break;
-				case CURVE:
-					{
-						TTF_Curve *curve = &segment->curve;
-						CHECKPTR(curve);
-						int k;
-						for (k = 0; k < curve->num_points; k++) {
-							curve->x[k] = funit_to_pixel(font, curve->x[k]);
-							curve->y[k] = funit_to_pixel(font, curve->y[k]);
-						}
-					}
-					break;
-				default:
-					break;
+			int k;
+			for (k = 0; k < segment->num_points; k++) {
+				segment->x[k] = funit_to_pixel(font, segment->x[k]);
+				segment->y[k] = funit_to_pixel(font, segment->y[k]);
 			}
 		}
 	}
@@ -49,10 +28,11 @@ static int scale_outline(TTF_Font *font, TTF_Outline *outline) {
 	printf("unscaled outline bounding box: (%f, %f, %f, %f)\n",
 			outline->x_min, outline->y_min, outline->x_max, outline->y_max);
 
-	outline->x_min = funit_to_pixel(font, outline->x_min);
-	outline->y_min = funit_to_pixel(font, outline->y_min);
-	outline->x_max = funit_to_pixel(font, outline->x_max);
-	outline->y_max = funit_to_pixel(font, outline->y_max);
+	/* Round outline bounding box to nearest whole pixel value */
+	outline->x_min = symroundf(funit_to_pixel(font, outline->x_min));
+	outline->y_min = symroundf(funit_to_pixel(font, outline->y_min));
+	outline->x_max = symroundf(funit_to_pixel(font, outline->x_max));
+	outline->y_max = symroundf(funit_to_pixel(font, outline->y_max));
 
 	printf("scaled outline bounding box: (%f, %f, %f, %f)\n",
 			outline->x_min, outline->y_min, outline->x_max, outline->y_max);

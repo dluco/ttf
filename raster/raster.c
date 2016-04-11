@@ -49,30 +49,10 @@ TTF_Bitmap *render_glyph(TTF_Glyph *glyph) {
 		int j;
 		for (j = 0; j < contour->num_segments; j++) {
 			TTF_Segment *segment = &contour->segments[j];
-			switch (segment->type) {
-				case LINE:
-					{
-						TTF_Line *line = &segment->line;
-						int k;
-						for (k = 0; k < 2; k++) {
-							line->x[k] = (line->x[k] - outline->x_min);
-							line->y[k] = (outline->y_max - outline->y_min) - (line->y[k] - outline->y_min);
-						}
-					}
-					break;
-				case CURVE:
-					{
-						TTF_Curve *curve = &segment->curve;
-						int k;
-						for (k = 0; k < curve->num_points; k++) {
-							curve->x[k] = (curve->x[k] - outline->x_min);
-							curve->y[k] = (outline->y_max - outline->y_min) - (curve->y[k] - outline->y_min);
-						}
-					}
-					break;
-				default:
-					// Do nothing
-					break;
+			int k;
+			for (k = 0; k < segment->num_points; k++) {
+				segment->x[k] = (segment->x[k] - outline->x_min);
+				segment->y[k] = (outline->y_max - outline->y_min) - (segment->y[k] - outline->y_min);
 			}
 		}
 	}
@@ -89,8 +69,6 @@ TTF_Bitmap *render_glyph(TTF_Glyph *glyph) {
 	}
 	render_outline(bitmap, outline, 0xFFFFFF);
 
-//	free_outline(outline);
-
 	return bitmap;
 }
 
@@ -106,11 +84,11 @@ int render_outline(TTF_Bitmap *bitmap, TTF_Outline *outline, uint32_t c) {
 		for (j = 0; j < contour->num_segments; j++) {
 			TTF_Segment *segment = &contour->segments[j];
 			switch (segment->type) {
-				case LINE:
-					render_line(bitmap, &segment->line, c);
+				case LINE_SEGMENT:
+					render_line(bitmap, segment, c);
 					break;
-				case CURVE:
-					render_curve(bitmap, &segment->curve, c);
+				case CURVE_SEGMENT:
+					render_curve(bitmap, segment, c);
 					break;
 				default:
 					// Do nothing
@@ -122,7 +100,7 @@ int render_outline(TTF_Bitmap *bitmap, TTF_Outline *outline, uint32_t c) {
 	return 1;
 }
 
-int render_line(TTF_Bitmap *bitmap, TTF_Line *line, uint32_t c) {
+int render_line(TTF_Bitmap *bitmap, TTF_Segment *line, uint32_t c) {
 	if (!bitmap || !line) {
 		return 0;
 	}
@@ -232,11 +210,21 @@ static inline int bezier(float mu, float *p, int n) {
 	return b;
 }
 
-int render_curve(TTF_Bitmap *bitmap, TTF_Curve *curve, uint32_t c) {
+int render_curve(TTF_Bitmap *bitmap, TTF_Segment *curve, uint32_t c) {
 	if (!bitmap || !curve) {
 		return 0;
 	}
-	TTF_Line line;
+	TTF_Segment line;
+	init_segment(&line, 2);
+
+//	line.x[0] = curve->x[0];
+//	line.y[0] = curve->y[0];
+//	line.x[1] = curve->x[2];
+//	line.y[1] = curve->y[2];
+//
+//	render_line(bitmap, &line, c);
+//	return 1;
+
 	int n_steps = 100;
 	float t, step = 1.0/n_steps;
 	int i, x, y, xp = curve->x[0], yp = curve->y[0];
@@ -251,6 +239,8 @@ int render_curve(TTF_Bitmap *bitmap, TTF_Curve *curve, uint32_t c) {
 
 		render_line(bitmap, &line, c);
 	}
+
+	free_segment(&line);
 
 	return 1;
 }

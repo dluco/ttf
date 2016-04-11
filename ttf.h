@@ -13,6 +13,7 @@
 
 #include "raster/raster.h"
 #include "raster/scale.h"
+#include "raster/scan.h"
 #include "raster/bitmap.h"
 
 #include "utils/utils.h"

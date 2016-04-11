@@ -5,8 +5,8 @@
 #define FAILURE 0
 
 typedef enum _Segment_Type {
-	LINE,
-	CURVE
+	LINE_SEGMENT,
+	CURVE_SEGMENT
 } Segment_Type;
 
 typedef enum _Coord_Flags {

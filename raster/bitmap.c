@@ -114,9 +114,7 @@ int save_bitmap(TTF_Bitmap *bitmap, const char *filename, const char *title) {
 	// End write
 	png_write_end(png_ptr, NULL);
 
-	RETURN(
-		/* FAILURE */
-		PASS,
+	RETRELEASE(
 		/* RELEASE */
 		if (row) free(row);
 		if (info_ptr) png_free_data(png_ptr, info_ptr, PNG_FREE_ALL, -1);
