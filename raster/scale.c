@@ -1,5 +1,5 @@
 #include "scale.h"
-#include "config.h"
+#include "raster.h"
 #include "../glyph/outline.h"
 #include "../utils/utils.h"
 #include <math.h>
@@ -9,12 +9,10 @@
 static int scale_outline(TTF_Font *font, TTF_Outline *outline) {
 	CHECKPTR(outline);
 
-	int i;
-	for (i = 0; i < outline->num_contours; i++) {
+	for (int i = 0; i < outline->num_contours; i++) {
 		TTF_Contour *contour = &outline->contours[i];
 		CHECKPTR(contour);
-		int j;
-		for (j = 0; j < contour->num_segments; j++) {
+		for (int j = 0; j < contour->num_segments; j++) {
 			TTF_Segment *segment = &contour->segments[j];
 			CHECKPTR(segment);
 			int k;
@@ -25,17 +23,46 @@ static int scale_outline(TTF_Font *font, TTF_Outline *outline) {
 		}
 	}
 
-	printf("unscaled outline bounding box: (%f, %f, %f, %f)\n",
-			outline->x_min, outline->y_min, outline->x_max, outline->y_max);
+	if ((font->raster_flags & RENDER_FPAA)) {
+		/* Oversample glyph outline. */
+		for (int i = 0; i < outline->num_contours; i++) {
+			TTF_Contour *contour = &outline->contours[i];
+			CHECKPTR(contour);
+			for (int j = 0; j < contour->num_segments; j++) {
+				TTF_Segment *segment = &contour->segments[j];
+				CHECKPTR(segment);
+				int k;
+				for (k = 0; k < segment->num_points; k++) {
+					segment->x[k] = round_pixel(2 * segment->x[k]);
+					segment->y[k] = round_pixel(2 * segment->y[k]);
+				}
+			}
+		}
 
-	/* Round outline bounding box to nearest whole pixel value */
-	outline->x_min = symroundf(funit_to_pixel(font, outline->x_min));
-	outline->y_min = symroundf(funit_to_pixel(font, outline->y_min));
-	outline->x_max = symroundf(funit_to_pixel(font, outline->x_max));
-	outline->y_max = symroundf(funit_to_pixel(font, outline->y_max));
+		printf("unscaled outline bounding box: (%f, %f, %f, %f)\n",
+				outline->x_min, outline->y_min, outline->x_max, outline->y_max);
 
-	printf("scaled outline bounding box: (%f, %f, %f, %f)\n",
-			outline->x_min, outline->y_min, outline->x_max, outline->y_max);
+		/* Round outline bounding box to nearest whole pixel value */
+		outline->x_min = symroundf(2 * funit_to_pixel(font, outline->x_min));
+		outline->y_min = symroundf(2 * funit_to_pixel(font, outline->y_min));
+		outline->x_max = symroundf(2 * funit_to_pixel(font, outline->x_max));
+		outline->y_max = symroundf(2 * funit_to_pixel(font, outline->y_max));
+
+		printf("scaled outline bounding box: (%f, %f, %f, %f)\n",
+				outline->x_min, outline->y_min, outline->x_max, outline->y_max);
+	} else {
+		printf("unscaled outline bounding box: (%f, %f, %f, %f)\n",
+				outline->x_min, outline->y_min, outline->x_max, outline->y_max);
+
+		/* Round outline bounding box to nearest whole pixel value */
+		outline->x_min = symroundf(funit_to_pixel(font, outline->x_min));
+		outline->y_min = symroundf(funit_to_pixel(font, outline->y_min));
+		outline->x_max = symroundf(funit_to_pixel(font, outline->x_max));
+		outline->y_max = symroundf(funit_to_pixel(font, outline->y_max));
+
+		printf("scaled outline bounding box: (%f, %f, %f, %f)\n",
+				outline->x_min, outline->y_min, outline->x_max, outline->y_max);
+	}
 
 	outline->point = font->point;
 

@@ -6,7 +6,7 @@
 #include <stdlib.h>
 #include <math.h>
 
-int raster_init(TTF_Font *font, uint16_t point, uint16_t dpi) {
+int raster_init(TTF_Font *font, uint16_t point, uint16_t dpi, uint32_t flags) {
 	CHECKPTR(font);
 
 	font->point = point;
@@ -19,6 +19,8 @@ int raster_init(TTF_Font *font, uint16_t point, uint16_t dpi) {
 
 	// Calculate pixel per em (ppem)
 	font->ppem = (font->point * font->dpi) / 72;
+
+	font->raster_flags = flags;
 
 	return SUCCESS;
 }

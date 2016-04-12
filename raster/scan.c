@@ -1,4 +1,6 @@
 #include "scan.h"
+#include "raster.h"
+#include "scale.h"
 #include "bitmap.h"
 #include "../base/consts.h"
 #include "../utils/utils.h"
@@ -190,56 +192,74 @@ int scan_glyph(TTF_Font *font, TTF_Glyph *glyph) {
 	}
 
 	TTF_Outline *outline = glyph->outline;
+	TTF_Bitmap *bitmap = NULL;
 
-	if (!glyph->bitmap) {
-		glyph->bitmap = create_bitmap(outline->x_max - outline->x_min + 1,
-				outline->y_max - outline->y_min + 1, 0x000000);
+	if (font->raster_flags & RENDER_FPAA) {
+		/* Anti-aliased rendering - oversample outline then downsample. */
+		if (!glyph->bitmap) {
+			glyph->bitmap = create_bitmap((outline->x_max - outline->x_min) / 2,
+					(outline->y_max - outline->y_min) / 2, 0xFFFFFF);
+		}
+
+		/* Intermediate oversampled bitmap. */
+		bitmap = create_bitmap(outline->x_max - outline->x_min,
+				outline->y_max - outline->y_min, 0xFFFFFF);
+	} else {
+		/* Normal rendering - write directly to glyph bitmap. */
+		if (!glyph->bitmap) {
+			glyph->bitmap = create_bitmap(outline->x_max - outline->x_min,
+					outline->y_max - outline->y_min, 0xFFFFFF);
+		}
+
+		bitmap = glyph->bitmap;
 	}
 
-	TTF_Bitmap *bitmap = glyph->bitmap;
-
 	/* Create a scan-line for each row in the scaled outline. */
-	int num_scanlines = outline->y_max - outline->y_min + 1;
+	int num_scanlines = outline->y_max - outline->y_min;
 	TTF_Scan_Line *scanlines = malloc(num_scanlines * sizeof(*scanlines));
 	CHECKFAIL(scanlines, warnerr("failed to alloc glyph scan lines"));
 
 	/* Find intersections of each scan-line with contour segments. */
-	int i;
-	for (i = 0; i < num_scanlines; i++) {
-		init_scanline(&scanlines[i], outline->num_contours * 2);
-		scanlines[i].y = outline->y_max - i;
+	for (int i = 0; i < num_scanlines; i++) {
+		TTF_Scan_Line *scanline = &scanlines[i];
+		init_scanline(scanline, outline->num_contours * 2);
+		scanline->y = outline->y_max - i;
 
-		int j;
-		for (j = 0; j < outline->num_contours; j++) {
+		for (int j = 0; j < outline->num_contours; j++) {
 			TTF_Contour *contour = &outline->contours[j];
 			int k;
 			for (k = 0; k < contour->num_segments; k++) {
 				TTF_Segment *segment = &contour->segments[k];
-				intersect_segment(segment, &scanlines[i]);
+				intersect_segment(segment, scanline);
 			}
 		}
 
+		/* Round pixel intersection values to 1/64 of a pixel. */
+		for (int j = 0; j < scanline->num_intersections; j++) {
+			scanline->x[j] = round_pixel(scanline->x[j]);
+		}
+
 		/* Sort intersections from left to right. */
-		qsort(scanlines[i].x, scanlines[i].num_intersections, sizeof(*scanlines[i].x), cmp_intersections);
+		qsort(scanline->x, scanline->num_intersections, sizeof(*scanline->x), cmp_intersections);
 
 		printf("Intersections: ");
 		char *sep = "";
-		for (j = 0; j < scanlines[i].num_intersections; j++) {
-			printf("%s%f", sep, scanlines[i].x[j]);
+		for (int j = 0; j < scanline->num_intersections; j++) {
+			printf("%s%f", sep, scanline->x[j]);
 			sep = ", ";
 		}
 		printf("\n");
 
 		int int_index = 0, fill = 0;
-		for (j = 0; j < bitmap->w; j++) {
-			if (int_index < scanlines[i].num_intersections) {
-				if ((outline->x_min + j) >= scanlines[i].x[int_index]) {
+		for (int j = 0; j < bitmap->w; j++) {
+			if (int_index < scanline->num_intersections) {
+				if ((outline->x_min + j) >= scanline->x[int_index]) {
 					fill = !fill;
 
 					/* Skip over duplicate intersections. */
 					int k;
-					for (k = 1; int_index+k < scanlines[i].num_intersections; k++) {
-						if (scanlines[i].x[int_index] != scanlines[i].x[int_index+k]) {
+					for (k = 1; int_index+k < scanline->num_intersections; k++) {
+						if (scanline->x[int_index] != scanline->x[int_index+k]) {
 							break;
 						}
 					}
@@ -247,9 +267,31 @@ int scan_glyph(TTF_Font *font, TTF_Glyph *glyph) {
 				}
 			}
 			if (fill) {
-				bitmap_set(bitmap, j, i, 0xFFFFFF);
+				bitmap_set(bitmap, j, i, 0x000000);
 			}
 		}
+	}
+
+	if (font->raster_flags & RENDER_FPAA) {
+		/* Downsample intermediate bitmap. */
+		for (int y = 0; y < glyph->bitmap->h; y++) {
+			for (int x = 0; x < glyph->bitmap->w; x++) {
+				/* Calculate pixel coverage:
+				 * 	coverage = number filled samples / number samples */
+				float coverage = 0;
+				if (bitmap_get(bitmap, (2*x), (2*y)) == 0x000000) coverage++;
+				if (bitmap_get(bitmap, (2*x)+1, (2*y)) == 0x000000) coverage++;
+				if (bitmap_get(bitmap, (2*x), (2*y)+1) == 0x000000) coverage++;
+				if (bitmap_get(bitmap, (2*x)+1, (2*y)+1) == 0x000000) coverage++;
+				coverage /= 4;
+				uint8_t shade = 0xFF*(1-coverage);
+				uint32_t pixel = (shade << 16) | (shade << 8) | (shade << 0);
+
+				bitmap_set(glyph->bitmap, x, y, pixel);
+			}
+		}
+
+		free_bitmap(bitmap);
 	}
 
 	RETRELEASE(free_scanlines(scanlines, num_scanlines));

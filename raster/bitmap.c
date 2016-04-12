@@ -1,6 +1,9 @@
 #include "bitmap.h"
-#include <stdlib.h>
+#include "../utils/utils.h"
+#include <malloc.h>
 #include <png.h>
+
+#define MAX(a, b) (((a) > (b)) ? (a) : (b))
 
 TTF_Bitmap *create_bitmap(int w, int h, uint32_t c) {
 	TTF_Bitmap *bitmap = (TTF_Bitmap *) malloc(sizeof(*bitmap));
@@ -48,6 +51,53 @@ uint32_t bitmap_get(TTF_Bitmap *bitmap, int x, int y) {
 		return 0;
 	}
 	return bitmap->data[y*bitmap->w + x];
+}
+
+TTF_Bitmap *copy_bitmap(TTF_Bitmap *bitmap) {
+	if (!bitmap) {
+		return NULL;
+	}
+
+	TTF_Bitmap *copy = create_bitmap(bitmap->w, bitmap->h, 0x000000);
+
+	int y;
+	for (y = 0; y < bitmap->h; y++) {
+		int x;
+		for (x = 0; x < bitmap->w; x++) {
+			bitmap_set(copy, x, y, bitmap_get(bitmap, x, y));
+		}
+	}
+
+	return copy;
+}
+
+TTF_Bitmap *combine_bitmaps(TTF_Bitmap *a, TTF_Bitmap *b, uint32_t c) {
+	if (!a || !b) {
+		return NULL;
+	}
+
+	TTF_Bitmap *out = create_bitmap(a->w + b->w, MAX(a->h, b->h), c);
+	if (!c) {
+		warn("failed to combine bitmaps");
+		return NULL;
+	}
+
+	int y;
+	for (y = 0; y < a->h; y++) {
+		int x;
+		for (x = 0; x < a->w; x++) {
+			bitmap_set(out, x, y, bitmap_get(a, x, y));
+		}
+	}
+
+	for (y = 0; y < b->h; y++) {
+		int x;
+		for (x = 0; x < b->w; x++) {
+			bitmap_set(out, x + a->w, y, bitmap_get(b, x, y));
+		}
+	}
+
+	return out;
 }
 
 static inline void set_rgb(png_byte *ptr, uint32_t value) {

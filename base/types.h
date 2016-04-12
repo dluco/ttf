@@ -192,6 +192,7 @@ typedef struct _TTF_Font {
 	uint16_t dpi;
 	uint16_t ppem;
 	uint16_t upem;
+	uint32_t raster_flags;
 } TTF_Font;
 
 #endif /* TYPES_H */
