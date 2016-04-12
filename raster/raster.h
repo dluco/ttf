@@ -4,8 +4,9 @@
 #include "../base/types.h"
 
 typedef enum _Raster_Opts {
-	RENDER_FP	=	1 << 0,
-	RENDER_FPAA	=	1 << 1
+	RENDER_FP		=	1 << 0,
+	RENDER_FPAA		=	1 << 1,
+	RENDER_ASPAA	=	1 << 2,
 } Raster_Opts;
 
 int raster_init(TTF_Font *font, uint16_t point, uint16_t dpi, uint32_t flags);

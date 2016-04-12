@@ -8,14 +8,14 @@ int main(int argc, char* argv[]) {
 	char *filename = NULL;
 	if (argc != 2) {
 		// Default
-		filename = (char *) "data/Vera.ttf";
+		filename = (char *) "./data/Vera.ttf";
 	} else {
 		filename = argv[1];
 	}
 
 	TTF_Font *font = load_font(filename);
 
-	raster_init(font, 12, DPI, RENDER_FPAA);
+	raster_init(font, 12, DPI, RENDER_ASPAA);
 
 	TTF_Bitmap *out = NULL, *tmp = NULL;
 	char *string = "m";

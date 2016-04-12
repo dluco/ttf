@@ -25,6 +25,7 @@ TTF_Bitmap *create_bitmap(int w, int h, uint32_t c) {
 	for (i = 0; i < (bitmap->w * bitmap->h); i++) {
 		bitmap->data[i] = c;
 	}
+	bitmap->c = c;
 
 	return bitmap;
 }
@@ -40,15 +41,15 @@ void free_bitmap(TTF_Bitmap *bitmap) {
 }
 
 void bitmap_set(TTF_Bitmap *bitmap, int x, int y, uint32_t c) {
-	if (!bitmap || x < 0 || x > bitmap->w || y < 0 || y > bitmap->h) {
+	if (!bitmap || x < 0 || x >= bitmap->w || y < 0 || y >= bitmap->h) {
 		return;
 	}
 	bitmap->data[y*bitmap->w + x] = c;
 }
 
 uint32_t bitmap_get(TTF_Bitmap *bitmap, int x, int y) {
-	if (!bitmap || x < 0 || x > bitmap->w || y < 0 || y > bitmap->h) {
-		return 0;
+	if (!bitmap || x < 0 || x >= bitmap->w || y < 0 || y >= bitmap->h) {
+		return bitmap->c;
 	}
 	return bitmap->data[y*bitmap->w + x];
 }
@@ -58,7 +59,7 @@ TTF_Bitmap *copy_bitmap(TTF_Bitmap *bitmap) {
 		return NULL;
 	}
 
-	TTF_Bitmap *copy = create_bitmap(bitmap->w, bitmap->h, 0x000000);
+	TTF_Bitmap *copy = create_bitmap(bitmap->w, bitmap->h, bitmap->c);
 
 	int y;
 	for (y = 0; y < bitmap->h; y++) {

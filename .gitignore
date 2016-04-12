@@ -4,6 +4,7 @@
 ttf
 ttf-debug
 
+*.ttf
 output.png
 
 examples/

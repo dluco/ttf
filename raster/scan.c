@@ -193,22 +193,41 @@ int scan_glyph(TTF_Font *font, TTF_Glyph *glyph) {
 
 	TTF_Outline *outline = glyph->outline;
 	TTF_Bitmap *bitmap = NULL;
+	uint32_t bg, fg;
 
 	if (font->raster_flags & RENDER_FPAA) {
 		/* Anti-aliased rendering - oversample outline then downsample. */
+		bg = 0xFFFFFF;
+		fg = 0x000000;
 		if (!glyph->bitmap) {
 			glyph->bitmap = create_bitmap((outline->x_max - outline->x_min) / 2,
-					(outline->y_max - outline->y_min) / 2, 0xFFFFFF);
+					(outline->y_max - outline->y_min) / 2, bg);
 		}
 
 		/* Intermediate oversampled bitmap. */
 		bitmap = create_bitmap(outline->x_max - outline->x_min,
-				outline->y_max - outline->y_min, 0xFFFFFF);
+				outline->y_max - outline->y_min, bg);
+	} else if (font->raster_flags & RENDER_ASPAA) {
+		/* Sub-pixel rendering - oversample in x-direction then downsample. */
+//		bg = 0x000000;
+//		fg = 0xFFFFFF;
+		bg = 0xFFFFFF;
+		fg = 0x000000;
+		if (!glyph->bitmap) {
+			glyph->bitmap = create_bitmap((outline->x_max - outline->x_min) / 3,
+					outline->y_max - outline->y_min, bg);
+		}
+
+		/* Intermediate oversampled bitmap. */
+		bitmap = create_bitmap(outline->x_max - outline->x_min,
+				outline->y_max - outline->y_min, bg);
 	} else {
 		/* Normal rendering - write directly to glyph bitmap. */
+		bg = 0xFFFFFF;
+		fg = 0x000000;
 		if (!glyph->bitmap) {
 			glyph->bitmap = create_bitmap(outline->x_max - outline->x_min,
-					outline->y_max - outline->y_min, 0xFFFFFF);
+					outline->y_max - outline->y_min, bg);
 		}
 
 		bitmap = glyph->bitmap;
@@ -267,7 +286,7 @@ int scan_glyph(TTF_Font *font, TTF_Glyph *glyph) {
 				}
 			}
 			if (fill) {
-				bitmap_set(bitmap, j, i, 0x000000);
+				bitmap_set(bitmap, j, i, fg);
 			}
 		}
 	}
@@ -286,6 +305,41 @@ int scan_glyph(TTF_Font *font, TTF_Glyph *glyph) {
 				coverage /= 4;
 				uint8_t shade = 0xFF*(1-coverage);
 				uint32_t pixel = (shade << 16) | (shade << 8) | (shade << 0);
+
+				bitmap_set(glyph->bitmap, x, y, pixel);
+			}
+		}
+
+		free_bitmap(bitmap);
+	} else if (font->raster_flags & RENDER_ASPAA) {
+		/* Perform five element low-pass filter. */
+		TTF_Bitmap *temp = create_bitmap(bitmap->w, bitmap->h, bg);
+
+		for (int y = 0; y < bitmap->h; y++) {
+			for (int x = 0; x < bitmap->w; x++) {
+				uint32_t pixel = 0x000000;
+
+				pixel += bitmap_get(bitmap, x-2, y) * (1.0 / 9.0);
+				pixel += bitmap_get(bitmap, x-1, y) * (2.0 / 9.0);
+				pixel += bitmap_get(bitmap, x, y) * (3.0 / 9.0);
+				pixel += bitmap_get(bitmap, x+1, y) * (2.0 / 9.0);
+				pixel += bitmap_get(bitmap, x+2, y) * (1.0 / 9.0);
+
+				bitmap_set(temp, x, y, pixel);
+			}
+		}
+
+		free_bitmap(bitmap);
+		bitmap = temp;
+
+		/* Downsample intermediate bitmap. */
+		for (int y = 0; y < glyph->bitmap->h; y++) {
+			for (int x = 0; x < glyph->bitmap->w; x++) {
+				uint8_t r, g, b;
+				r = (bitmap_get(bitmap, (3*x), y) * 0xFF) / 0xFFFFFF;
+				g = (bitmap_get(bitmap, (3*x)+1, y) * 0xFF) / 0xFFFFFF;
+				b = (bitmap_get(bitmap, (3*x)+2, y) * 0xFF) / 0xFFFFFF;
+				uint32_t pixel = (r << 16) | (g << 8) | (b << 0);
 
 				bitmap_set(glyph->bitmap, x, y, pixel);
 			}

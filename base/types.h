@@ -53,6 +53,7 @@ typedef struct _TTF_Outline {
 typedef struct _TTF_Bitmap {
 	int w, h;
 	uint32_t *data;
+	uint32_t c;
 } TTF_Bitmap;
 
 typedef struct _TTF_Glyph {
