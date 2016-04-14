@@ -82,7 +82,11 @@ int draw_glyph(TTF_Font *font, TTF_Bitmap *canvas, TTF_Glyph *glyph, int x, int 
 
 	// Position glyph baseline at y
 	if (glyph->outline) {
-		ascent = roundf(glyph->outline->y_max);
+		if (font->raster_flags & RENDER_FPAA) {
+			ascent = roundf(glyph->outline->y_max / 2);
+		} else {
+			ascent = roundf(glyph->outline->y_max);
+		}
 	}
 
 	// Draw glyph bitmap onto canvas

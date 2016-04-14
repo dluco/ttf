@@ -1,6 +1,7 @@
 #include "bitmap.h"
 #include "../utils/utils.h"
 #include <stdlib.h>
+#include <math.h>
 #include <png.h>
 
 TTF_Bitmap *create_bitmap(int w, int h, uint32_t c) {
@@ -83,6 +84,28 @@ int draw_bitmap(TTF_Bitmap *canvas, TTF_Bitmap *bitmap, int x, int y) {
 	for (int yb = 0; yb < bitmap->h; yb++) {
 		for (int xb = 0; xb < bitmap->w; xb++) {
 			bitmap_set(canvas, x+xb, y+yb, bitmap_get(bitmap, xb, yb));
+		}
+	}
+
+	return SUCCESS;
+}
+
+int set_bitmap_gamma(TTF_Bitmap *bitmap, float gamma) {
+	CHECKPTR(bitmap);
+
+	if (gamma == 0) {
+		return FAILURE;
+	}
+	float correction = 1 / gamma;
+
+	for (int y = 0; y < bitmap->h; y++) {
+		for (int x = 0; x < bitmap->w; x++) {
+			uint32_t pixel = bitmap_get(bitmap, x, y);
+			uint8_t *b = (uint8_t *)&pixel;
+			b[0] = 255 * powf((b[0] / (float)255), correction);
+			b[1] = 255 * powf((b[1] / (float)255), correction);
+			b[2] = 255 * powf((b[2] / (float)255), correction);
+			bitmap_set(bitmap, x, y, pixel);
 		}
 	}
 
