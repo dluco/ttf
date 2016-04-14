@@ -59,7 +59,7 @@ int get_text_width(TTF_Font *font, const char *text) {
 		if (glyph_index < 0) {
 			continue;
 		}
-		width += funit_to_pixel(font, hmtx->advance_width[glyph_index]);
+		width += roundf(funit_to_pixel(font, hmtx->advance_width[glyph_index]));
 	}
 
 	return width;
