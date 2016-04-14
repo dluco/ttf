@@ -1,6 +1,7 @@
 #ifndef UTILS_H
 #define UTILS_H
 
+#include "../base/types.h"
 #include "../base/consts.h"
 
 #define PASS ;
@@ -40,6 +41,8 @@ _release:								\
 #define RETRELEASE(RELEASE) \
 	RETFAILRELEASE(PASS, RELEASE)
 
+#define MAX(a, b) (((a) > (b)) ? (a) : (b))
+
 #define IN(x, a, b) ((x) >= (a) && (x) <= (b))
 
 int mod(int a, int b);
@@ -47,5 +50,7 @@ float symroundf(float f);
 
 void warn(const char *fmt, ...);
 void warnerr(const char *fmt, ...);
+
+int get_text_width(TTF_Font *font, const char *text);
 
 #endif /* UTILS_H */

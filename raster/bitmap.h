@@ -9,6 +9,8 @@ void free_bitmap(TTF_Bitmap *bitmap);
 void bitmap_set(TTF_Bitmap *bitmap, int x, int y, uint32_t c);
 uint32_t bitmap_get(TTF_Bitmap *bitmap, int x, int y);
 
+int draw_bitmap(TTF_Bitmap *canvas, TTF_Bitmap *bitmap, int x, int y);
+
 TTF_Bitmap *copy_bitmap(TTF_Bitmap *bitmap);
 TTF_Bitmap *combine_bitmaps(TTF_Bitmap *a, TTF_Bitmap *b, uint32_t c);
 

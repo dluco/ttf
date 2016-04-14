@@ -816,6 +816,11 @@ int load_glyf_table(TTF_Font *font, TTF_Table *table) {
 	int i;
 	for (i = 0; i < glyf->num_glyphs; i++) {
 		TTF_Glyph *glyph = &glyf->glyphs[i];
+		/* Calculate the glyph length. */
+		if ((loca->offsets[i+1] - loca->offsets[i]) == 0) {
+			/* A zero-length glyph does not contain an outline. */
+			continue;
+		}
 		if (lseek(font->fd, table->offset + loca->offsets[i], SEEK_SET) < 0) {
 			warnerr("failed to seek to glyph %d: %s", i);
 			return 0;
@@ -874,6 +879,54 @@ int load_hhea_table(TTF_Font *font, TTF_Table *table) {
 	return 1;
 }
 
+int load_hmtx_table(TTF_Font *font, TTF_Table *table) {
+	hmtx_Table *hmtx = &table->data.hmtx;
+
+	/* Get hhea and maxp tables. */
+	hhea_Table *hhea = get_hhea_table(font);
+	if (!hhea) {
+		warn("failed to get hhea table");
+		return 0;
+	}
+	maxp_Table *maxp = get_maxp_table(font);
+	if (!maxp) {
+		warn("failed to get maxp table");
+		return 0;
+	}
+
+	hmtx->num_h_metrics = hhea->num_of_long_hor_metrics;
+
+	hmtx->advance_width = malloc(hmtx->num_h_metrics * sizeof(*hmtx->advance_width));
+	if (!hmtx->advance_width) {
+		warnerr("failed to alloc hmtx advance widths");
+		return 0;
+	}
+	hmtx->left_side_bearing = malloc(hmtx->num_h_metrics * sizeof(*hmtx->left_side_bearing));
+	if (!hmtx->left_side_bearing) {
+		warnerr("failed to alloc hmtx left side bearings");
+		return 0;
+	}
+
+	int i;
+	for (i = 0; i < hmtx->num_h_metrics; i++) {
+		hmtx->advance_width[i] = read_ushort(font->fd);
+		hmtx->left_side_bearing[i] = read_short(font->fd);
+	}
+
+	hmtx->num_non_horizontal_metrics = maxp->num_glyphs - hhea->num_of_long_hor_metrics;
+	hmtx->non_horizontal_left_side_bearing = malloc(hmtx->num_non_horizontal_metrics * sizeof(*hmtx->non_horizontal_left_side_bearing));
+	if (!hmtx->non_horizontal_left_side_bearing) {
+		warnerr("failed to alloc hmtx non horizontal left side bearings");
+		return 0;
+	}
+
+	for (i = 0; i < hmtx->num_non_horizontal_metrics; i++) {
+		hmtx->non_horizontal_left_side_bearing[i] = read_short(font->fd);
+	}
+
+	return 1;
+}
+
 int load_loca_table(TTF_Font *font, TTF_Table *table) {
 	loca_Table *loca = &table->data.loca;
 
@@ -889,14 +942,18 @@ int load_loca_table(TTF_Font *font, TTF_Table *table) {
 		return 0;
 	}
 
-	loca->offsets = (uint32_t *) malloc((maxp->num_glyphs + 1) * sizeof(*loca->offsets));
+	/* The loca table contains num_glyphs+1 offsets. The last offset is used
+	 * only to compute the length of the n-1-th glyph. */
+	loca->num_offsets = maxp->num_glyphs + 1;
+
+	loca->offsets = malloc(loca->num_offsets * sizeof(*loca->offsets));
 	if (!loca->offsets) {
 		warnerr("failed to alloc loca offsets");
 		return 0;
 	}
 
 	int i;
-	for (i = 0; i < maxp->num_glyphs; i++) {
+	for (i = 0; i < loca->num_offsets; i++) {
 		switch (head->index_to_loc_format) {
 			case SHORT_OFFSETS:
 				loca->offsets[i] = read_ushort(font->fd) * 2;
@@ -1121,7 +1178,7 @@ int load_table(TTF_Font *font, TTF_Table *table) {
 		case 0x61656868:	/* hhea */
 			return load_hhea_table(font, table);
 		case 0x78746d68:	/* hmtx */
-			break;
+			return load_hmtx_table(font, table);
 		case 0x6e72656b:	/* kern */
 			break;
 		case 0x61636f6c:	/* loca */

@@ -63,6 +63,14 @@ hhea_Table *get_hhea_table(TTF_Font *font) {
 	return (table) ? &table->data.hhea : NULL;
 }
 
+hmtx_Table *get_hmtx_table(TTF_Font *font) {
+	if (!font) {
+		return NULL;
+	}
+	TTF_Table *table = get_table(font, 0x78746d68);
+	return (table) ? &table->data.hmtx : NULL;
+}
+
 loca_Table *get_loca_table(TTF_Font *font) {
 	if (!font) {
 		return NULL;
@@ -106,6 +114,9 @@ void free_table(TTF_Table *table) {
 			break;
 		case 0x61656868:	/* hhea */
 			free_hhea_table(&table->data.hhea);
+			break;
+		case 0x78746d68:	/* hmtx */
+			free_hmtx_table(&table->data.hmtx);
 			break;
 		case 0x61636f6c:	/* loca */
 			free_loca_table(&table->data.loca);
@@ -169,6 +180,21 @@ void free_head_table(head_Table *head) {
 void free_hhea_table(hhea_Table *hhea) {
 	if (!hhea) {
 		return;
+	}
+}
+
+void free_hmtx_table(hmtx_Table *hmtx) {
+	if (!hmtx) {
+		return;
+	}
+	if (hmtx->advance_width) {
+		free(hmtx->advance_width);
+	}
+	if (hmtx->left_side_bearing) {
+		free(hmtx->left_side_bearing);
+	}
+	if (hmtx->non_horizontal_left_side_bearing) {
+		free(hmtx->non_horizontal_left_side_bearing);
 	}
 }
 

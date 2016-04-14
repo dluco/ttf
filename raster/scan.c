@@ -189,6 +189,9 @@ int scan_glyph(TTF_Font *font, TTF_Glyph *glyph) {
 	} else if (glyph->outline->point < 0) {
 		warn("failed to scan unscaled glyph outline");
 		return FAILURE;
+	} else if (glyph->number_of_contours == 0) {
+		/* Zero-length glyph with no outline. */
+		return SUCCESS;
 	}
 
 	TTF_Outline *outline = glyph->outline;
@@ -209,8 +212,6 @@ int scan_glyph(TTF_Font *font, TTF_Glyph *glyph) {
 				outline->y_max - outline->y_min, bg);
 	} else if (font->raster_flags & RENDER_ASPAA) {
 		/* Sub-pixel rendering - oversample in x-direction then downsample. */
-//		bg = 0x000000;
-//		fg = 0xFFFFFF;
 		bg = 0xFFFFFF;
 		fg = 0x000000;
 		if (!glyph->bitmap) {
@@ -261,13 +262,13 @@ int scan_glyph(TTF_Font *font, TTF_Glyph *glyph) {
 		/* Sort intersections from left to right. */
 		qsort(scanline->x, scanline->num_intersections, sizeof(*scanline->x), cmp_intersections);
 
-		printf("Intersections: ");
-		char *sep = "";
-		for (int j = 0; j < scanline->num_intersections; j++) {
-			printf("%s%f", sep, scanline->x[j]);
-			sep = ", ";
-		}
-		printf("\n");
+//		printf("Intersections: ");
+//		char *sep = "";
+//		for (int j = 0; j < scanline->num_intersections; j++) {
+//			printf("%s%f", sep, scanline->x[j]);
+//			sep = ", ";
+//		}
+//		printf("\n");
 
 		int int_index = 0, fill = 0;
 		for (int j = 0; j < bitmap->w; j++) {

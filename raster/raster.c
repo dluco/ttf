@@ -1,10 +1,16 @@
 #include "raster.h"
+#include "scale.h"
+#include "scan.h"
 #include "bitmap.h"
+#include "../glyph/glyph.h"
 #include "../glyph/outline.h"
 #include "../tables/tables.h"
 #include "../utils/utils.h"
 #include <stdlib.h>
+#include <string.h>
 #include <math.h>
+
+#include <stdio.h>
 
 int raster_init(TTF_Font *font, uint16_t point, uint16_t dpi, uint32_t flags) {
 	CHECKPTR(font);
@@ -21,6 +27,82 @@ int raster_init(TTF_Font *font, uint16_t point, uint16_t dpi, uint32_t flags) {
 	font->ppem = (font->point * font->dpi) / 72;
 
 	font->raster_flags = flags;
+
+	return SUCCESS;
+}
+
+int draw_string(TTF_Font *font, TTF_Bitmap *canvas, int x, int y, const char *string) {
+	CHECKPTR(font);
+	CHECKPTR(canvas);
+	CHECKPTR(string);
+
+	RETINIT(SUCCESS);
+
+	CHECKFAIL(IN(x, 0, canvas->w-1), warn("failed to draw string out of bounds"));
+	CHECKFAIL(IN(y, 0, canvas->h-1), warn("failed to draw string out of bounds"));
+
+	for (int i = 0; i < (int)strlen(string); i++) {
+		TTF_Glyph *glyph = get_glyph(font, string[i]);
+		if (!glyph) {
+			warn("failed to get glyph for '%c'", string[i]);
+			continue;
+		}
+		draw_glyph(font, canvas, glyph, x, y);
+
+		/* Move x forward by the glyph's advance width. */
+		x += roundf(funit_to_pixel(font, get_glyph_advance_width(font, glyph)));
+	}
+
+	RET;
+}
+
+int draw_glyph(TTF_Font *font, TTF_Bitmap *canvas, TTF_Glyph *glyph, int x, int y) {
+	CHECKPTR(font);
+	CHECKPTR(canvas);
+	CHECKPTR(glyph);
+
+	RETINIT(SUCCESS);
+
+	CHECKFAIL(IN(x, 0, canvas->w-1), warn("failed to draw glyph out of bounds"));
+	CHECKFAIL(IN(y, 0, canvas->h-1), warn("failed to draw glyph out of bounds"));
+
+	/* Prepare glyph for rendering. */
+	raster_glyph(font, glyph);
+
+	if (glyph->number_of_contours == 0) {
+		/* Glyph has no outline - don't draw anything. */
+		return SUCCESS;
+	} else if (!glyph->bitmap) {
+		warn("failed to draw empty glyph");
+		return FAILURE;
+	}
+
+	int16_t lsb = roundf(funit_to_pixel(font, get_glyph_left_side_bearing(font, glyph)));
+	int16_t ascent = 0;
+
+	// Position glyph baseline at y
+	if (glyph->outline) {
+		ascent = roundf(glyph->outline->y_max);
+	}
+
+	// Draw glyph bitmap onto canvas
+	draw_bitmap(canvas, glyph->bitmap, x + lsb, y - ascent);
+
+	RET;
+}
+
+int raster_glyph(TTF_Font *font, TTF_Glyph *glyph) {
+	CHECKPTR(font);
+	CHECKPTR(glyph);
+
+	if (!scale_glyph(font, glyph)) {
+		warn("failed to scale glyph");
+		return FAILURE;
+	}
+	if (!scan_glyph(font, glyph)) {
+		warn("failed to scan glyph");
+		return FAILURE;
+	}
 
 	return SUCCESS;
 }
@@ -218,14 +300,6 @@ int render_curve(TTF_Bitmap *bitmap, TTF_Segment *curve, uint32_t c) {
 	}
 	TTF_Segment line;
 	init_segment(&line, 2);
-
-//	line.x[0] = curve->x[0];
-//	line.y[0] = curve->y[0];
-//	line.x[1] = curve->x[2];
-//	line.y[1] = curve->y[2];
-//
-//	render_line(bitmap, &line, c);
-//	return 1;
 
 	int n_steps = 100;
 	float t, step = 1.0/n_steps;

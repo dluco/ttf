@@ -1,9 +1,7 @@
 #include "bitmap.h"
 #include "../utils/utils.h"
-#include <malloc.h>
+#include <stdlib.h>
 #include <png.h>
-
-#define MAX(a, b) (((a) > (b)) ? (a) : (b))
 
 TTF_Bitmap *create_bitmap(int w, int h, uint32_t c) {
 	TTF_Bitmap *bitmap = (TTF_Bitmap *) malloc(sizeof(*bitmap));
@@ -41,14 +39,14 @@ void free_bitmap(TTF_Bitmap *bitmap) {
 }
 
 void bitmap_set(TTF_Bitmap *bitmap, int x, int y, uint32_t c) {
-	if (!bitmap || x < 0 || x >= bitmap->w || y < 0 || y >= bitmap->h) {
+	if (!bitmap || !IN(x, 0, bitmap->w-1) || !IN(y, 0, bitmap->h-1)) {
 		return;
 	}
 	bitmap->data[y*bitmap->w + x] = c;
 }
 
 uint32_t bitmap_get(TTF_Bitmap *bitmap, int x, int y) {
-	if (!bitmap || x < 0 || x >= bitmap->w || y < 0 || y >= bitmap->h) {
+	if (!bitmap || !IN(x, 0, bitmap->w-1) || !IN(y, 0, bitmap->h-1)) {
 		return bitmap->c;
 	}
 	return bitmap->data[y*bitmap->w + x];
@@ -70,6 +68,25 @@ TTF_Bitmap *copy_bitmap(TTF_Bitmap *bitmap) {
 	}
 
 	return copy;
+}
+
+int draw_bitmap(TTF_Bitmap *canvas, TTF_Bitmap *bitmap, int x, int y) {
+	CHECKPTR(canvas);
+	CHECKPTR(bitmap);
+
+	if (!IN(x, 0, canvas->w-1) || !IN(y, 0, canvas->h-1)) {
+		warn("failed to draw bitmap out of bounds");
+		return FAILURE;
+	}
+
+	/* Out of bounds checking is also done in bitmap_set,_get() */
+	for (int yb = 0; yb < bitmap->h; yb++) {
+		for (int xb = 0; xb < bitmap->w; xb++) {
+			bitmap_set(canvas, x+xb, y+yb, bitmap_get(bitmap, xb, yb));
+		}
+	}
+
+	return SUCCESS;
 }
 
 TTF_Bitmap *combine_bitmaps(TTF_Bitmap *a, TTF_Bitmap *b, uint32_t c) {

@@ -5,7 +5,7 @@
 #include "../utils/utils.h"
 #include <stdlib.h>
 
-uint32_t get_glyph_index(TTF_Font *font, int16_t c) {
+int32_t get_glyph_index(TTF_Font *font, int16_t c) {
 	if (!font) {
 		return -1;
 	}
@@ -42,10 +42,40 @@ TTF_Glyph *get_glyph(TTF_Font *font, int16_t c) {
 	// Lookup glyph index in cmap table
 	uint32_t glyph_index = get_glyph_index(font, c);
 	if (glyph_index < glyf->num_glyphs) {
-		return &glyf->glyphs[glyph_index];
+		TTF_Glyph *glyph = &glyf->glyphs[glyph_index];
+		glyph->index = glyph_index;
+		return glyph;
 	}
 
 	return NULL;
+}
+
+uint16_t get_glyph_advance_width(TTF_Font *font, TTF_Glyph *glyph) {
+	if (!font || !glyph) {
+		return 0;
+	}
+
+	hmtx_Table *hmtx = get_hmtx_table(font);
+	if (!hmtx) {
+		warn("failed to get glyph advance width");
+		return 0;
+	}
+
+	return hmtx->advance_width[glyph->index];
+}
+
+int16_t get_glyph_left_side_bearing(TTF_Font *font, TTF_Glyph *glyph) {
+	if (!font || !glyph) {
+		return 0;
+	}
+
+	hmtx_Table *hmtx = get_hmtx_table(font);
+	if (!hmtx) {
+		warn("failed to get glyph left side bearing");
+		return 0;
+	}
+
+	return hmtx->left_side_bearing[glyph->index];
 }
 
 void free_glyph(TTF_Glyph *glyph) {

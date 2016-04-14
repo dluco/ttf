@@ -3,7 +3,7 @@
 #include "../tables/tables.h"
 #include "../parse/parse.h"
 #include "../utils/utils.h"
-#include <malloc.h>
+#include <stdlib.h>
 
 TTF_Font *load_font(const char *filename) {
 	TTF_Font *font = (TTF_Font*) malloc(sizeof(TTF_Font));
@@ -56,4 +56,28 @@ void free_font(TTF_Font *font) {
 		free(font->tables);
 	}
 	free(font);
+}
+
+int16_t get_font_ascent(TTF_Font *font) {
+	if (!font) {
+		return 0;
+	}
+	hhea_Table *hhea = get_hhea_table(font);
+	if (!hhea) {
+		warn("failed to get font ascent");
+		return 0;
+	}
+	return hhea->ascent;
+}
+
+int16_t get_font_descent(TTF_Font *font) {
+	if (!font) {
+		return 0;
+	}
+	hhea_Table *hhea = get_hhea_table(font);
+	if (!hhea) {
+		warn("failed to get font descent");
+		return 0;
+	}
+	return hhea->descent;
 }

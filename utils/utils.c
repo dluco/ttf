@@ -1,4 +1,7 @@
 #include "utils.h"
+#include "../glyph/glyph.h"
+#include "../tables/tables.h"
+#include "../raster/scale.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdarg.h>
@@ -36,4 +39,28 @@ void warnerr(const char *fmt, ...) {
 	} else {
 		fprintf(stderr, "\n");
 	}
+}
+
+int get_text_width(TTF_Font *font, const char *text) {
+	if (!font || !text) {
+		return 0;
+	}
+
+	hmtx_Table *hmtx = get_hmtx_table(font);
+	if (!hmtx) {
+		warn("failed to calculate text width");
+		return 0;
+	}
+
+	int width = 0;
+	/* Get advance width of each character's glyph. */
+	for (int i = 0; i < (int)strlen(text); i++) {
+		int32_t glyph_index = get_glyph_index(font, text[i]);
+		if (glyph_index < 0) {
+			continue;
+		}
+		width += funit_to_pixel(font, hmtx->advance_width[glyph_index]);
+	}
+
+	return width;
 }

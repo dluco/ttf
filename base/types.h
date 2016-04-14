@@ -71,6 +71,7 @@ typedef struct _TTF_Glyph {
 	int16_t *y_coordinates;
 
 	int16_t num_points;
+	uint32_t index;
 
 	TTF_Outline *outline;
 	TTF_Bitmap *bitmap;
@@ -122,8 +123,18 @@ typedef struct _hhea_Table {
 	uint16_t num_of_long_hor_metrics;
 } hhea_Table;
 
+typedef struct _hmtx_Table {
+	uint16_t *advance_width;
+	int16_t *left_side_bearing;
+	int16_t *non_horizontal_left_side_bearing;
+
+	uint16_t num_h_metrics;
+	uint16_t num_non_horizontal_metrics;
+} hmtx_Table;
+
 typedef struct _loca_Table {
 	uint32_t *offsets;
+	uint16_t num_offsets;
 } loca_Table;
 
 typedef struct _maxp_Table {
@@ -172,6 +183,7 @@ typedef struct _TTF_Table {
 		glyf_Table glyf;
 		head_Table head;
 		hhea_Table hhea;
+		hmtx_Table hmtx;
 		loca_Table loca;
 		maxp_Table maxp;
 		post_Table post;

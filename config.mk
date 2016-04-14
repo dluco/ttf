@@ -6,13 +6,13 @@ MODULES := base tables glyph parse raster utils
 TAGFILE := .tags
 
 # C compiler
-CC := cc
+CC := gcc
 
 # C compiler flags
 CFLAGS := -Wall -Wextra -Werror -pedantic -std=c99 -I.
 
 # C preprocessor
-CPP := cpp
+CPP := gcc
 
 # C preprocessor flags
 CPPFLAGS :=
@@ -28,7 +28,7 @@ DEPFLAGS := -MG -MP
 
 # Release flags
 CFLAGS.release := -O2 -flto
-LDFLAGS.release := -O2 -flto -s
+LDFLAGS.release := -O2 -flto
 
 # Debug flags
 CFLAGS.debug := -g -O0 -DDEBUG
