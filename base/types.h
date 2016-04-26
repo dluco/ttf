@@ -26,7 +26,13 @@ typedef struct _cmap_Table {
 
 typedef struct _cvt_Table {
 	int16_t *control_values;
+	uint16_t num_values;
 } cvt_Table;
+
+typedef struct _fpgm_Table {
+	uint8_t *instructions;
+	uint16_t num_instructions;
+} fpgm_Table;
 
 typedef struct _TTF_Segment {
 	int type;
@@ -180,6 +186,7 @@ typedef struct _TTF_Table {
 	union {
 		cmap_Table cmap;
 		cvt_Table cvt;
+		fpgm_Table fpgm;
 		glyf_Table glyf;
 		head_Table head;
 		hhea_Table hhea;

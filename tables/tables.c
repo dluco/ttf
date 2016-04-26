@@ -39,6 +39,14 @@ cvt_Table *get_cvt_table(TTF_Font *font) {
 	return (table) ? &table->data.cvt : NULL;
 }
 
+fpgm_Table *get_fpgm_table(TTF_Font *font) {
+	if (!font) {
+		return NULL;
+	}
+	TTF_Table *table = get_table(font, 0x6d677066);
+	return (table) ? &table->data.fpgm : NULL;
+}
+
 glyf_Table *get_glyf_table(TTF_Font *font) {
 	if (!font) {
 		return NULL;
@@ -106,6 +114,9 @@ void free_table(TTF_Table *table) {
 		case 0x20747663:	/* cvt  */
 			free_cvt_table(&table->data.cvt);
 			break;
+		case 0x6d677066:	/* fpgm */
+			free_fpgm_table(&table->data.fpgm);
+			break;
 		case 0x66796c67:	/* glyf */
 			free_glyf_table(&table->data.glyf);
 			break;
@@ -154,6 +165,15 @@ void free_cvt_table(cvt_Table *cvt) {
 	}
 	if (cvt->control_values) {
 		free(cvt->control_values);
+	}
+}
+
+void free_fpgm_table(fpgm_Table *fpgm) {
+	if (!fpgm) {
+		return;
+	}
+	if (fpgm->instructions) {
+		free(fpgm->instructions);
 	}
 }
 

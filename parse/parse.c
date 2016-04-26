@@ -661,16 +661,34 @@ int load_cmap_table(TTF_Font *font, TTF_Table *table) {
 int load_cvt_table(TTF_Font *font, TTF_Table *table) {
 	cvt_Table *cvt = &table->data.cvt;
 
-	int num_values = table->length / 4;
-	cvt->control_values = (int16_t *) malloc(num_values * sizeof(*cvt->control_values));
+	cvt->num_values = table->length / 2;
+	cvt->control_values = malloc(cvt->num_values * sizeof(*cvt->control_values));
 	if (!cvt->control_values) {
 		warnerr("failed to alloc control values");
 		return 0;
 	}
 
 	int i;
-	for (i = 0; i < num_values; i++) {
+	for (i = 0; i < cvt->num_values; i++) {
 		cvt->control_values[i] = read_short(font->fd);
+	}
+
+	return 1;
+}
+
+int load_fpgm_table(TTF_Font *font, TTF_Table *table) {
+	fpgm_Table *fpgm = &table->data.fpgm;
+
+	fpgm->num_instructions = table->length;
+	fpgm->instructions = malloc(fpgm->num_instructions * sizeof(*fpgm->instructions));
+	if (!fpgm->instructions) {
+		warnerr("failed to alloc fpgm instructions");
+		return 0;
+	}
+
+	int i;
+	for (i = 0; i < fpgm->num_instructions; i++) {
+		fpgm->instructions[i] = read_byte(font->fd);
 	}
 
 	return 1;
@@ -1166,7 +1184,7 @@ int load_table(TTF_Font *font, TTF_Table *table) {
 		case 0x20747663:	/* cvt  */
 			return load_cvt_table(font, table);
 		case 0x6d677066:	/* fpgm */
-			break;
+			return load_fpgm_table(font, table);
 		case 0x70736167:	/* gasp */
 			break;
 		case 0x66796c67:	/* glyf */
