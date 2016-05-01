@@ -9,28 +9,72 @@ typedef enum _Segment_Type {
 	CURVE_SEGMENT
 } Segment_Type;
 
+typedef enum _Compound_Comp_Flags {
+	/**
+	 * If set, the arguments are words; If not set, they are bytes.
+	 */
+	ARG_1_AND_2_ARE_WORDS		=	(1 << 0),
+	/**
+	 * If set, the arguments are xy values; If not set, they are points.
+	 */
+	ARGS_ARE_XY_VALUES			=	(1 << 1),
+	/**
+	 * If set, round the xy values to grid;
+	 * If not set do not round xy values to grid (relevant only to bit 1 is set)
+	 */
+	ROUND_XY_TO_GRID			=	(1 << 2),
+	/**
+	 * If set, there is a simple scale for the component. If not set, scale is 1.0.
+	 */
+	WE_HAVE_A_SCALE				=	(1 << 3),
+	/**
+	 * If set, at least one additional glyph follows this one.
+	 */
+	MORE_COMPONENTS				=	(1 << 5),
+	/**
+	 * If set the x direction will use a different scale than the y direction.
+	 */
+	WE_HAVE_AN_X_AND_Y_VALUE	=	(1 << 6),
+	/**
+	 * If set there is a 2-by-2 transformation that will be used to scale the component.
+	 */
+	WE_HAVE_A_TWO_BY_TWO		=	(1 << 7),
+	/**
+	 * If set, instructions for the component character follow the last component.
+	 */
+	WE_HAVE_INSTRUCTIONS		=	(1 << 8),
+	/**
+	 * Use metrics from this component for the compound glyph.
+	 */
+	USE_MY_METRICS				=	(1 << 9),
+	/**
+	 * If set, the components of this compound glyph overlap.
+	 */
+	OVERLAP_COMPOUND			=	(1 << 10),
+} Compound_Comp_Flags;
+
 typedef enum _Coord_Flags {
 	/**
 	 * If set, the point is on the curve;
 	 * Otherwise, it is off the curve.
 	 */
-	ON_CURVE =			1 << 0,
+	ON_CURVE =			(1 << 0),
 	/**
 	 * If set, the corresponding x-coordinate is 1 byte long;
 	 * Otherwise, the corresponding x-coordinate is 2 bytes long
 	 */
-	X_SHORT_VECTOR =	1 << 1,
+	X_SHORT_VECTOR =	(1 << 1),
 	/**
 	 * If set, the corresponding y-coordinate is 1 byte long;
 	 * Otherwise, the corresponding y-coordinate is 2 bytes long
 	 */
-	Y_SHORT_VECTOR =	1 << 2,
+	Y_SHORT_VECTOR =	(1 << 2),
 	/**
 	 * If set, the next byte specifies the number of additional
 	 * times this set of flags is to be repeated. In this way, the number
 	 * of flags listed can be smaller than the number of points in a character.
 	 */
-	REPEAT =			1 << 3,
+	REPEAT =			(1 << 3),
 	/**
 	 * This flag has one of two meanings, depending on how the
 	 * x-Short Vector flag is set.
@@ -44,7 +88,7 @@ typedef enum _Coord_Flags {
 	 * the current x-coordinate is a signed 16-bit delta vector.
 	 * In this case, the delta vector is the change in x
 	 */
-	X_DUAL =			1 << 4,
+	X_DUAL =			(1 << 4),
 	/**
 	 * This flag has one of two meanings, depending on how the
 	 * y-Short Vector flag is set.
@@ -59,7 +103,7 @@ typedef enum _Coord_Flags {
 	 * the current y-coordinate is a signed 16-bit delta vector.
 	 * In this case, the delta vector is the change in y
 	 */
-	Y_DUAL =			1 << 5,
+	Y_DUAL =			(1 << 5),
 } Coord_Flags;
 
 /**

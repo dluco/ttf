@@ -6,21 +6,22 @@ static inline uint16_t wrap(uint16_t x, uint16_t start, uint16_t end) {
 	return ((x - start) % (end - start + 1)) + start;
 }
 
-static int load_glyph_contour(TTF_Glyph *glyph, TTF_Contour *contour, uint16_t start_pt, uint16_t end_pt) {
+static int load_simple_glyph_contour(TTF_Glyph *glyph, TTF_Contour *contour, uint16_t start_pt, uint16_t end_pt) {
 	CHECKPTR(glyph);
 	CHECKPTR(contour);
 
 	RETINIT(SUCCESS);
 
+	TTF_Simple_Glyph *simp_glyph = &glyph->descrip.simple;
 	contour->num_segments = 0;
 
 	/* Count the number of segments in the contour:
 	 * number of on-curve points + interpolated on-curve points */
 	uint16_t i;
 	for (i = start_pt; i <= end_pt; i++) {
-		if ((glyph->flags[i] & ON_CURVE)) {
+		if ((simp_glyph->flags[i] & ON_CURVE)) {
 			contour->num_segments++;
-		} else if (i > start_pt && !(glyph->flags[i-1] & ON_CURVE)) {
+		} else if (i > start_pt && !(simp_glyph->flags[i-1] & ON_CURVE)) {
 			/* Points j and j-1 are both off-curve,
 			 * interpolate an on-curve point between them. */
 			contour->num_segments++;
@@ -35,7 +36,7 @@ static int load_glyph_contour(TTF_Glyph *glyph, TTF_Contour *contour, uint16_t s
 	for (seg_index = 0; seg_index < contour->num_segments; seg_index++) {
 		TTF_Segment *segment = &contour->segments[seg_index];
 
-		if ((glyph->flags[wrap(seg_start+1, start_pt, end_pt)] & ON_CURVE)) {
+		if ((simp_glyph->flags[wrap(seg_start+1, start_pt, end_pt)] & ON_CURVE)) {
 			/* Segment is a line */
 			segment->type = LINE_SEGMENT;
 
@@ -43,8 +44,8 @@ static int load_glyph_contour(TTF_Glyph *glyph, TTF_Contour *contour, uint16_t s
 
 			uint16_t j;
 			for (j = 0; j < 2; j++) {
-				segment->x[j] = glyph->x_coordinates[wrap(seg_start+j, start_pt, end_pt)];
-				segment->y[j] = glyph->y_coordinates[wrap(seg_start+j, start_pt, end_pt)];
+				segment->x[j] = simp_glyph->x_coordinates[wrap(seg_start+j, start_pt, end_pt)];
+				segment->y[j] = simp_glyph->y_coordinates[wrap(seg_start+j, start_pt, end_pt)];
 			}
 
 			/* Advance seg_start to end point of line. */
@@ -57,16 +58,16 @@ static int load_glyph_contour(TTF_Glyph *glyph, TTF_Contour *contour, uint16_t s
 
 			uint16_t j;
 			for (j = 0; j < 2; j++) {
-				segment->x[j] = glyph->x_coordinates[wrap(seg_start+j, start_pt, end_pt)];
-				segment->y[j] = glyph->y_coordinates[wrap(seg_start+j, start_pt, end_pt)];
+				segment->x[j] = simp_glyph->x_coordinates[wrap(seg_start+j, start_pt, end_pt)];
+				segment->y[j] = simp_glyph->y_coordinates[wrap(seg_start+j, start_pt, end_pt)];
 			}
 
 			/* (Loop to decompose quadratic B-splines into quadratic Bezier curves.) */
 			while (seg_start <= end_pt) {
 				/* If the next point is on-curve, this curve ends. */
-				if ((glyph->flags[wrap(seg_start+2, start_pt, end_pt)] & ON_CURVE)) {
-					segment->x[2] = glyph->x_coordinates[wrap(seg_start+2, start_pt, end_pt)];
-					segment->y[2] = glyph->y_coordinates[wrap(seg_start+2, start_pt, end_pt)];
+				if ((simp_glyph->flags[wrap(seg_start+2, start_pt, end_pt)] & ON_CURVE)) {
+					segment->x[2] = simp_glyph->x_coordinates[wrap(seg_start+2, start_pt, end_pt)];
+					segment->y[2] = simp_glyph->y_coordinates[wrap(seg_start+2, start_pt, end_pt)];
 
 					seg_start += 2;
 
@@ -78,8 +79,8 @@ static int load_glyph_contour(TTF_Glyph *glyph, TTF_Contour *contour, uint16_t s
 				uint16_t p1 = wrap(seg_start+1, start_pt, end_pt);
 				uint16_t p2 = wrap(seg_start+2, start_pt, end_pt);
 
-				segment->x[2] = ((float)(glyph->x_coordinates[p1] + glyph->x_coordinates[p2])) / 2;
-				segment->y[2] = ((float)(glyph->y_coordinates[p1] + glyph->y_coordinates[p2])) / 2;
+				segment->x[2] = ((float)(simp_glyph->x_coordinates[p1] + simp_glyph->x_coordinates[p2])) / 2;
+				segment->y[2] = ((float)(simp_glyph->y_coordinates[p1] + simp_glyph->y_coordinates[p2])) / 2;
 
 				 /* The current curve is now complete. */
 
@@ -99,8 +100,8 @@ static int load_glyph_contour(TTF_Glyph *glyph, TTF_Contour *contour, uint16_t s
 
 					/* The curve's second point is the off-curve point that appears after the 
 					 * previous curve's off-curve point. */
-					segment->x[1] = glyph->x_coordinates[wrap(seg_start+1, start_pt, end_pt)];
-					segment->y[1] = glyph->y_coordinates[wrap(seg_start+1, start_pt, end_pt)];
+					segment->x[1] = simp_glyph->x_coordinates[wrap(seg_start+1, start_pt, end_pt)];
+					segment->y[1] = simp_glyph->y_coordinates[wrap(seg_start+1, start_pt, end_pt)];
 
 					/* This is now the same situation as before. That is, the current curve will end
 					 * if the next point is on-curve, and if it is off-curve, another endpoint will
@@ -113,7 +114,7 @@ static int load_glyph_contour(TTF_Glyph *glyph, TTF_Contour *contour, uint16_t s
 	RET;
 }
 
-int load_glyph_outline(TTF_Glyph *glyph) {
+int load_simple_glyph_outline(TTF_Glyph *glyph) {
 	CHECKPTR(glyph);
 
 	RETINIT(SUCCESS);
@@ -136,16 +137,28 @@ int load_glyph_outline(TTF_Glyph *glyph) {
 	int i;
 	for (i = 0; i < glyph->number_of_contours; i++) {
 		TTF_Contour *contour = &outline->contours[i];
-		uint16_t start_pt = (i > 0) ? glyph->end_pts_of_contours[i-1] + 1 : 0;
-		uint16_t end_pt = glyph->end_pts_of_contours[i];
+		uint16_t start_pt = (i > 0) ? glyph->descrip.simple.end_pts_of_contours[i-1] + 1 : 0;
+		uint16_t end_pt = glyph->descrip.simple.end_pts_of_contours[i];
 
-		load_glyph_contour(glyph, contour, start_pt, end_pt);
+		load_simple_glyph_contour(glyph, contour, start_pt, end_pt);
 	}
 
 	// Outline is unscaled
 	outline->point = -1;
 
 	RETFAIL(free_outline(outline));
+}
+
+int load_glyph_outline(TTF_Glyph *glyph) {
+	CHECKPTR(glyph);
+
+	if (glyph->number_of_contours > 0) {
+		load_simple_glyph_outline(glyph);
+	} else {
+		// TODO: handle compound glyph outlines
+	}
+
+	return SUCCESS;
 }
 
 int init_segment(TTF_Segment *segment, int num_points) {

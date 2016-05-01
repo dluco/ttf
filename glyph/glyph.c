@@ -78,24 +78,44 @@ int16_t get_glyph_left_side_bearing(TTF_Font *font, TTF_Glyph *glyph) {
 	return hmtx->left_side_bearing[glyph->index];
 }
 
+void free_simple_glyph(TTF_Glyph *glyph) {
+	if (!glyph) {
+		return;
+	}
+	if (glyph->descrip.simple.end_pts_of_contours) {
+		free(glyph->descrip.simple.end_pts_of_contours);
+	}
+	if (glyph->descrip.simple.flags) {
+		free(glyph->descrip.simple.flags);
+	}
+	if (glyph->descrip.simple.x_coordinates) {
+		free(glyph->descrip.simple.x_coordinates);
+	}
+	if (glyph->descrip.simple.y_coordinates) {
+		free(glyph->descrip.simple.y_coordinates);
+	}
+}
+
+void free_compound_glyph(TTF_Glyph *glyph) {
+	if (!glyph) {
+		return;
+	}
+	if (glyph->descrip.compound.comps) {
+		free(glyph->descrip.compound.comps);
+	}
+}
+
 void free_glyph(TTF_Glyph *glyph) {
 	if (!glyph) {
 		return;
 	}
-	if (glyph->end_pts_of_contours) {
-		free(glyph->end_pts_of_contours);
-	}
-	if (glyph->flags) {
-		free(glyph->flags);
+	if (glyph->number_of_contours > 0) {
+		free_simple_glyph(glyph);
+	} else if (glyph->number_of_contours < 0) {
+		free_compound_glyph(glyph);
 	}
 	if (glyph->instructions) {
 		free(glyph->instructions);
-	}
-	if (glyph->x_coordinates) {
-		free(glyph->x_coordinates);
-	}
-	if (glyph->y_coordinates) {
-		free(glyph->y_coordinates);
 	}
 	if (glyph->outline) {
 		free_outline(glyph->outline);

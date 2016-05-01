@@ -694,6 +694,173 @@ int load_fpgm_table(TTF_Font *font, TTF_Table *table) {
 	return 1;
 }
 
+int load_glyph_instructions(TTF_Font *font, TTF_Glyph *glyph) {
+	glyph->instruction_length = read_ushort(font->fd);
+
+	glyph->instructions = (uint8_t *) malloc(glyph->instruction_length * sizeof(*glyph->instructions));
+	if (!glyph->instructions) {
+		warnerr("failed to alloc glyph instructions");
+		return 0;
+	}
+
+	int i;
+	for (i = 0; i < glyph->instruction_length; i++) {
+		glyph->instructions[i] = read_byte(font->fd);
+	}
+
+	return 1;
+}
+
+int load_simple_glyph(TTF_Font *font, TTF_Glyph *glyph) {
+	TTF_Simple_Glyph *simp_glyph = &glyph->descrip.simple;
+
+	simp_glyph->end_pts_of_contours = (uint16_t *) malloc(glyph->number_of_contours * sizeof(*simp_glyph->end_pts_of_contours));
+	if (!simp_glyph->end_pts_of_contours) {
+		warnerr("failed to alloc glyph end points");
+		return 0;
+	}
+	int i;
+	for (i = 0; i < glyph->number_of_contours; i++) {
+		simp_glyph->end_pts_of_contours[i] = read_ushort(font->fd);
+	}
+
+	// Get the last contour's end point index
+	int last_end_pt = simp_glyph->end_pts_of_contours[glyph->number_of_contours - 1];
+	if (glyph->number_of_contours == 1 && last_end_pt == 65535) {
+		// Assume an empty glpyh
+		simp_glyph->num_points = 0;
+		return 1;
+	}
+	// Last end point index indicates the number of points
+	simp_glyph->num_points = last_end_pt + 1;
+
+	load_glyph_instructions(font, glyph);
+
+	simp_glyph->flags = (uint8_t *) malloc(simp_glyph->num_points * sizeof(*simp_glyph->flags));
+	if (!simp_glyph->flags) {
+		warnerr("failed to alloc glyph flags");
+		return 0;
+	}
+	simp_glyph->x_coordinates = (int16_t *) malloc(simp_glyph->num_points * sizeof(*simp_glyph->x_coordinates));
+	if (!simp_glyph->x_coordinates) {
+		warnerr("failed to alloc glyph x coordinates");
+		return 0;
+	}
+	simp_glyph->y_coordinates = (int16_t *) malloc(simp_glyph->num_points * sizeof(*simp_glyph->y_coordinates));
+	if (!simp_glyph->y_coordinates) {
+		warnerr("failed to alloc glyph y coordinates");
+		return 0;
+	}
+
+	// Read glyph flags
+	for (i = 0; i < simp_glyph->num_points; i++) {
+		simp_glyph->flags[i] = read_byte(font->fd);
+		if ((simp_glyph->flags[i] & REPEAT) != 0) {
+			// Last flag should be repeated some number of times
+			uint8_t repeats = read_byte(font->fd);
+			int j;
+			for (j = 1; j <= repeats; j++) {
+				simp_glyph->flags[i + j] = simp_glyph->flags[i];
+			}
+			i += repeats;
+		}
+	}
+
+	// Read x and y coordinates
+	int16_t x = 0, y = 0;
+	for (i = 0; i < simp_glyph->num_points; i++) {
+		if ((simp_glyph->flags[i] & X_DUAL) != 0) {
+			if ((simp_glyph->flags[i] & X_SHORT_VECTOR) != 0) {
+				x += (int16_t) read_byte(font->fd);
+			}
+		} else {
+			if ((simp_glyph->flags[i] & X_SHORT_VECTOR) != 0) {
+				x += -((int16_t) read_byte(font->fd));
+			} else {
+				x += read_short(font->fd);
+			}
+		}
+		simp_glyph->x_coordinates[i] = x;
+	}
+	for (i = 0; i < simp_glyph->num_points; i++) {
+		if ((simp_glyph->flags[i] & Y_DUAL) != 0) {
+			if ((simp_glyph->flags[i] & Y_SHORT_VECTOR) != 0) {
+				y += (int16_t) read_byte(font->fd);
+			}
+		} else {
+			if ((simp_glyph->flags[i] & Y_SHORT_VECTOR) != 0) {
+				y += -((int16_t) read_byte(font->fd));
+			} else {
+				y += read_short(font->fd);
+			}
+		}
+		simp_glyph->y_coordinates[i] = y;
+	}
+
+	return 1;
+}
+
+int load_compound_glyph_comp(TTF_Font *font, TTF_Compound_Comp *comp) {
+	comp->flags = read_short(font->fd);
+	comp->glyph_index = read_ushort(font->fd);
+
+	// Read arguments as words or bytes
+	if (comp->flags & ARG_1_AND_2_ARE_WORDS) {
+		comp->arg1 = read_short(font->fd);
+		comp->arg2 = read_short(font->fd);
+	} else {
+		comp->arg1 = (int16_t) read_byte(font->fd);
+		comp->arg2 = (int16_t) read_byte(font->fd);
+	}
+
+	// Assign arguments depending on type
+	if (comp->flags & ARGS_ARE_XY_VALUES) {
+		comp->xtranslate = comp->arg1;
+		comp->ytranslate = comp->arg2;
+	} else {
+		comp->point1 = (uint16_t) comp->arg1;
+		comp->point2 = (uint16_t) comp->arg2;
+	}
+
+	// Read scaling information
+	if (comp->flags & WE_HAVE_A_SCALE) {
+		comp->xscale = comp->yscale = (float) read_short(font->fd) / (float) 0x4000;
+	} else if (comp->flags & WE_HAVE_AN_X_AND_Y_VALUE) {
+		comp->xscale = (float) read_short(font->fd) / (float) 0x4000;
+		comp->yscale = (float) read_short(font->fd) / (float) 0x4000;
+	} else if (comp->flags & WE_HAVE_A_TWO_BY_TWO) {
+		comp->xscale = (float) read_short(font->fd) / (float) 0x4000;
+		comp->scale01 = (float) read_short(font->fd) / (float) 0x4000;
+		comp->scale10 = (float) read_short(font->fd) / (float) 0x4000;
+		comp->yscale = (float) read_short(font->fd) / (float) 0x4000;
+	}
+
+	return 1;
+}
+
+int load_compound_glyph(TTF_Font *font, TTF_Glyph *glyph) {
+	TTF_Compound_Glyph *comp_glyph = &glyph->descrip.compound;
+	comp_glyph->num_comps = 0;
+
+	// Load all compound glyph components
+	do {
+		comp_glyph->comps = realloc(comp_glyph->comps, (comp_glyph->num_comps+1) * sizeof(*comp_glyph->comps));
+		if (!comp_glyph->comps) {
+			warnerr("failed to alloc compound glyph component %hd", comp_glyph->num_comps);
+			return 0;
+		}
+		load_compound_glyph_comp(font, &comp_glyph->comps[comp_glyph->num_comps]);
+		comp_glyph->num_comps++;
+	} while (comp_glyph->comps && (comp_glyph->comps[comp_glyph->num_comps-1].flags & MORE_COMPONENTS));
+
+	// Instructions (if provided) follow the the last component
+	if (comp_glyph->comps && (comp_glyph->comps[comp_glyph->num_comps-1].flags & WE_HAVE_INSTRUCTIONS)) {
+		load_glyph_instructions(font, glyph);
+	}
+
+	return 1;
+}
+
 int load_glyph(TTF_Font *font, TTF_Glyph *glyph) {
 	glyph->number_of_contours = read_short(font->fd);
 	glyph->x_min = read_short(font->fd);
@@ -702,102 +869,14 @@ int load_glyph(TTF_Font *font, TTF_Glyph *glyph) {
 	glyph->y_max = read_short(font->fd);
 
 	if (glyph->number_of_contours == 0) {
-		glyph->num_points = 0;
+		// Empty glyph
 		return 1;
 	} else if (glyph->number_of_contours > 0) {
 		// Simple glyph
-		glyph->end_pts_of_contours = (uint16_t *) malloc(glyph->number_of_contours * sizeof(*glyph->end_pts_of_contours));
-		if (!glyph->end_pts_of_contours) {
-			warnerr("failed to alloc glyph end points");
-			return 0;
-		}
-		int i;
-		for (i = 0; i < glyph->number_of_contours; i++) {
-			glyph->end_pts_of_contours[i] = read_ushort(font->fd);
-		}
-		// Get the last contour's end point index
-		int last_end_pt = glyph->end_pts_of_contours[glyph->number_of_contours - 1];
-		if (glyph->number_of_contours == 1 && last_end_pt == 65535) {
-			// Assume an empty glpyh
-			glyph->num_points = 0;
-			return 1;
-		}
-		// Last end point index indicates the number of points
-		glyph->num_points = last_end_pt + 1;
-
-		glyph->instruction_length = read_ushort(font->fd);
-
-		glyph->instructions = (uint8_t *) malloc(glyph->instruction_length * sizeof(*glyph->instructions));
-		if (!glyph->instructions) {
-			warnerr("failed to alloc glyph instructions");
-			return 0;
-		}
-
-		glyph->flags = (uint8_t *) malloc(glyph->num_points * sizeof(*glyph->flags));
-		if (!glyph->flags) {
-			warnerr("failed to alloc glyph flags");
-			return 0;
-		}
-		glyph->x_coordinates = (int16_t *) malloc(glyph->num_points * sizeof(*glyph->x_coordinates));
-		if (!glyph->x_coordinates) {
-			warnerr("failed to alloc glyph x coordinates");
-			return 0;
-		}
-		glyph->y_coordinates = (int16_t *) malloc(glyph->num_points * sizeof(*glyph->y_coordinates));
-		if (!glyph->y_coordinates) {
-			warnerr("failed to alloc glyph y coordinates");
-			return 0;
-		}
-
-		for (i = 0; i < glyph->instruction_length; i++) {
-			glyph->instructions[i] = read_byte(font->fd);
-		}
-		for (i = 0; i < glyph->num_points; i++) {
-			glyph->flags[i] = read_byte(font->fd);
-			if ((glyph->flags[i] & REPEAT) != 0) {
-				// Last flag should be repeated some number of times
-				uint8_t repeats = read_byte(font->fd);
-				int j;
-				for (j = 1; j <= repeats; j++) {
-					glyph->flags[i + j] = glyph->flags[i];
-				}
-				i += repeats;
-			}
-		}
-
-		int16_t x = 0, y = 0;
-		for (i = 0; i < glyph->num_points; i++) {
-			if ((glyph->flags[i] & X_DUAL) != 0) {
-				if ((glyph->flags[i] & X_SHORT_VECTOR) != 0) {
-					x += (int16_t) read_byte(font->fd);
-				}
-			} else {
-				if ((glyph->flags[i] & X_SHORT_VECTOR) != 0) {
-					x += -((int16_t) read_byte(font->fd));
-				} else {
-					x += read_short(font->fd);
-				}
-			}
-			glyph->x_coordinates[i] = x;
-		}
-		for (i = 0; i < glyph->num_points; i++) {
-			if ((glyph->flags[i] & Y_DUAL) != 0) {
-				if ((glyph->flags[i] & Y_SHORT_VECTOR) != 0) {
-					y += (int16_t) read_byte(font->fd);
-				}
-			} else {
-				if ((glyph->flags[i] & Y_SHORT_VECTOR) != 0) {
-					y += -((int16_t) read_byte(font->fd));
-				} else {
-					y += read_short(font->fd);
-				}
-			}
-			glyph->y_coordinates[i] = y;
-		}
+		return load_simple_glyph(font, glyph);
 	} else {
 		// Compound glyph
-//		warn("unsupported compound glyph");
-		return 0;
+		return load_compound_glyph(font, glyph);
 	}
 
 	return 1;

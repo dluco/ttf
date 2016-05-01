@@ -62,6 +62,36 @@ typedef struct _TTF_Bitmap {
 	uint32_t c;
 } TTF_Bitmap;
 
+typedef struct _TTF_Simple_Glyph {
+	uint16_t *end_pts_of_contours;
+	uint16_t instruction_length;
+	uint8_t *instructions;
+	uint8_t *flags;
+	int16_t *x_coordinates;
+	int16_t *y_coordinates;
+	int16_t num_points;
+} TTF_Simple_Glyph;
+
+typedef struct _TTF_Compound_Comp {
+	uint16_t flags;
+	uint16_t glyph_index;
+	int16_t arg1;
+	int16_t arg2;
+	float xscale;
+	float yscale;
+	float scale01;
+	float scale10;
+	int16_t xtranslate;
+	int16_t ytranslate;
+	uint16_t point1;
+	uint16_t point2;
+} TTF_Compound_Comp;
+
+typedef struct _TTF_Compound_Glyph {
+	TTF_Compound_Comp *comps;
+	uint16_t num_comps;
+} TTF_Compound_Glyph;
+
 typedef struct _TTF_Glyph {
 	int16_t number_of_contours;
 	int16_t x_min;
@@ -69,14 +99,14 @@ typedef struct _TTF_Glyph {
 	int16_t x_max;
 	int16_t y_max;
 
-	uint16_t *end_pts_of_contours;
+	union {
+		TTF_Simple_Glyph simple;
+		TTF_Compound_Glyph compound;
+	} descrip;
+
 	uint16_t instruction_length;
 	uint8_t *instructions;
-	uint8_t *flags;
-	int16_t *x_coordinates;
-	int16_t *y_coordinates;
 
-	int16_t num_points;
 	uint32_t index;
 
 	TTF_Outline *outline;
@@ -85,7 +115,6 @@ typedef struct _TTF_Glyph {
 
 typedef struct _glyf_Table {
 	TTF_Glyph *glyphs;
-
 	uint16_t num_glyphs; /* Copied from maxp table. */
 } glyf_Table;
 
